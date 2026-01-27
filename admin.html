@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="lo">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - HR System</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&display=swap');
+
+        * {
+            font-family: 'Noto Sans Lao', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
+            min-height: 100vh;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 50;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <!-- Modals -->
+    <div id="registerModal" class="modal"></div>
+    <div id="editModal" class="modal"></div>
+    <div id="resetPINModal" class="modal"></div>
+
+    <script>
+        const CONFIG = {
+            API_URL: 'https://script.google.com/macros/s/AKfycbzvZk6JyPg8P_ogM8187VnOTYRc4R_xZZ77tX3AdHHxFmYcfGFypSQmYXbVRbZloMKS/exec'
+        };
+
+        let state = {
+            user: null,
+            employees: [],
+            selectedEmployee: null,
+            loading: false,
+            error: '',
+            success: ''
+        };
+
+        // ====== API CLIENT ======
+        async function callAPI(action, data = {}) {
+            try {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, ...data, currentUserId: state.user?.id })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // ====== INIT ======
+        async function init() {
+            // Check if user logged in
+            const userStr = localStorage.getItem('hrUser');
+            if (!userStr) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            state.user = JSON.parse(userStr);
+
+            // Verify admin role
+            if (state.user.role !== 'admin') {
+                alert('ບໍ່ມີສິດເຂົ້າເຖິງ - Admin ເທົ່ານັ້ນ');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            await loadEmployees();
+            render();
+        }
+
+        // ====== LOAD DATA ======
+        async function loadEmployees() {
+            state.loading = true;
+            render();
+
+            const result = await callAPI('getAllEmployees');
+
+            if (result.success) {
+                state.employees = result.employees;
+            } else {
+                state.error = result.error;
+            }
+
+            state.loading = false;
+            render();
+        }
+
+        // ====== RENDER ======
+        function render() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <!-- Header -->
+                <div class="glass border-b border-white/10 px-6 py-4 sticky top-0 z-40">
+                    <div class="max-w-7xl mx-auto flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
+                                <i data-lucide="shield" class="w-6 h-6 text-white"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-xl font-bold text-white">Admin Panel</h1>
+                                <p class="text-purple-300 text-sm">ຈັດການລະບົບ HR</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-white font-medium text-sm">${state.user?.name || ''}</p>
+                                <p class="text-purple-300 text-xs">${state.user?.position || ''}</p>
+                            </div>
+                            <button onclick="goBack()" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm flex items-center gap-2">
+                                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                                ກັບຄືນ
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Main Content -->
+                <div class="max-w-7xl mx-auto p-6">
+                    ${state.success ? `
+                        <div class="mb-4 p-4 bg-green-500/20 border border-green-400/50 rounded-xl">
+                            <p class="text-green-300 text-center">${state.success}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${state.error ? `
+                        <div class="mb-4 p-4 bg-red-500/20 border border-red-400/50 rounded-xl">
+                            <p class="text-red-300 text-center">${state.error}</p>
+                        </div>
+                    ` : ''}
+                    
+                    ${renderEmployeeList()}
+                </div>
+                
+                ${state.loading ? `
+                    <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div class="glass p-6 rounded-2xl">
+                            <p class="text-white">ກຳລັງໂຫຼດ...</p>
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            lucide.createIcons();
+        }
+
+        function renderEmployeeList() {
+            return `
+                <div class="glass rounded-2xl border border-white/20 overflow-hidden">
+                    <!-- Header -->
+                    <div class="p-6 border-b border-white/10 flex items-center justify-between">
+                        <div>
+                            <h2 class="text-white font-bold text-lg">ລາຍຊື່ພະນັກງານ</h2>
+                            <p class="text-purple-300 text-sm">ທັງໝົດ ${state.employees.length} ຄົນ</p>
+                        </div>
+                        <button onclick="openRegisterModal()" class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg flex items-center gap-2 hover:opacity-90">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            ລົງທະບຽນພະນັກງານໃໝ່
+                        </button>
+                    </div>
+                    
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-white/5">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ລະຫັດ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ຊື່-ນາມສະກຸນ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ຕຳແໜ່ງ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ເບີໂທ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ສິດ</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-purple-300 uppercase">ສະຖານະ</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-purple-300 uppercase">ການກະທຳ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/10">
+                                ${state.employees.map(emp => `
+                                    <tr class="hover:bg-white/5">
+                                        <td class="px-6 py-4 text-sm text-white font-medium">${emp.empCode}</td>
+                                        <td class="px-6 py-4 text-sm text-white">${emp.fullName}</td>
+                                        <td class="px-6 py-4 text-sm text-purple-300">${emp.position || '-'}</td>
+                                        <td class="px-6 py-4 text-sm text-purple-300">${emp.phone || '-'}</td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 text-xs rounded-full ${emp.role === 'admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}">
+                                                ${emp.role === 'admin' ? 'Admin' : 'User'}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-2 py-1 text-xs rounded-full ${emp.status === 'active' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}">
+                                                ${emp.status === 'active' ? 'ໃຊ້ງານ' : 'ປິດ'}
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 text-right">
+                                            <div class="flex items-center justify-end gap-2">
+                                                <button onclick='openEditModal(${JSON.stringify(emp)})' class="p-2 hover:bg-white/10 rounded-lg text-purple-300">
+                                                    <i data-lucide="edit" class="w-4 h-4"></i>
+                                                </button>
+                                                <button onclick='openResetPINModal(${JSON.stringify(emp)})' class="p-2 hover:bg-white/10 rounded-lg text-yellow-300">
+                                                    <i data-lucide="key" class="w-4 h-4"></i>
+                                                </button>
+                                                ${emp.status === 'active' ? `
+                                                    <button onclick="deactivateEmployee('${emp.id}')" class="p-2 hover:bg-white/10 rounded-lg text-red-300">
+                                                        <i data-lucide="user-x" class="w-4 h-4"></i>
+                                                    </button>
+                                                ` : ''}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ====== MODALS ======
+        function openRegisterModal() {
+            const modal = document.getElementById('registerModal');
+            modal.innerHTML = `
+                <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 border border-white/20">
+                    <h2 class="text-white font-bold text-xl mb-6">ລົງທະບຽນພະນັກງານໃໝ່</h2>
+                    
+                    <form id="registerForm" class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ລະຫັດພະນັກງານ *</label>
+                                <input type="text" name="empCode" required placeholder="EMP004"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">PIN (4 ໂຕເລກ) *</label>
+                                <div class="flex gap-2">
+                                    <input type="text" name="pin" required maxlength="4" pattern="\\d{4}" placeholder="1234"
+                                        class="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                                    <button type="button" onclick="generatePIN()" class="px-3 py-2 bg-purple-500/30 hover:bg-purple-500/50 rounded-lg text-purple-200">
+                                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="text-purple-200 text-sm mb-1 block">ຊື່-ນາມສະກຸນ *</label>
+                            <input type="text" name="fullName" required
+                                class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ອີເມລ</label>
+                                <input type="email" name="email"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ເບີໂທ</label>
+                                <input type="text" name="phone" placeholder="020XXXXXXXX"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ຕຳແໜ່ງ</label>
+                                <input type="text" name="position"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ເງິນເດືອນພື້ນຖານ (LAK)</label>
+                                <input type="number" name="baseSalary" min="0"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="text-purple-200 text-sm mb-2 block">ສິດການໃຊ້ງານ *</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="role" value="user" checked class="form-radio text-purple-500">
+                                    <span class="text-white">User (ພະນັກງານທົ່ວໄປ)</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="role" value="admin" class="form-radio text-purple-500">
+                                    <span class="text-white">Admin (ຜູ້ດູແລລະບົບ)</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="closeModal('registerModal')" 
+                                class="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white">
+                                ຍົກເລີກ
+                            </button>
+                            <button type="submit"
+                                class="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 rounded-lg text-white">
+                                ບັນທຶກ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            modal.classList.add('active');
+            lucide.createIcons();
+
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+        }
+
+        function openEditModal(emp) {
+            state.selectedEmployee = emp;
+            const modal = document.getElementById('editModal');
+            modal.innerHTML = `
+                <div class="glass rounded-2xl p-6 max-w-2xl w-full mx-4 border border-white/20">
+                    <h2 class="text-white font-bold text-xl mb-6">ແກ້ໄຂຂໍ້ມູນພະນັກງານ</h2>
+                    
+                    <form id="editForm" class="space-y-4">
+                        <div class="p-3 bg-purple-500/20 rounded-lg">
+                            <p class="text-purple-300 text-sm">ລະຫັດ: <span class="text-white font-medium">${emp.empCode}</span></p>
+                        </div>
+                        
+                        <div>
+                            <label class="text-purple-200 text-sm mb-1 block">ຊື່-ນາມສະກຸນ *</label>
+                            <input type="text" name="fullName" value="${emp.fullName}" required
+                                class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ອີເມລ</label>
+                                <input type="email" name="email" value="${emp.email || ''}"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ເບີໂທ</label>
+                                <input type="text" name="phone" value="${emp.phone || ''}"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ຕຳແໜ່ງ</label>
+                                <input type="text" name="position" value="${emp.position || ''}"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-1 block">ເງິນເດືອນພື້ນຖານ (LAK)</label>
+                                <input type="number" name="baseSalary" value="${emp.baseSalary || 0}" min="0"
+                                    class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-purple-200 text-sm mb-2 block">ສິດການໃຊ້ງານ</label>
+                                <select name="role" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                                    <option value="user" ${emp.role === 'user' ? 'selected' : ''}>User</option>
+                                    <option value="admin" ${emp.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-purple-200 text-sm mb-2 block">ສະຖານະ</label>
+                                <select name="status" class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
+                                    <option value="active" ${emp.status === 'active' ? 'selected' : ''}>ໃຊ້ງານ</option>
+                                    <option value="inactive" ${emp.status === 'inactive' ? 'selected' : ''}>ປິດ</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4">
+                            <button type="button" onclick="closeModal('editModal')" 
+                                class="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white">
+                                ຍົກເລີກ
+                            </button>
+                            <button type="submit"
+                                class="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90 rounded-lg text-white">
+                                ບັນທຶກ
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            modal.classList.add('active');
+            document.getElementById('editForm').addEventListener('submit', handleEdit);
+        }
+
+        function openResetPINModal(emp) {
+            state.selectedEmployee = emp;
+            const modal = document.getElementById('resetPINModal');
+            modal.innerHTML = `
+                <div class="glass rounded-2xl p-6 max-w-md w-full mx-4 border border-white/20">
+                    <h2 class="text-white font-bold text-xl mb-6">ລີເຊັດ PIN</h2>
+                    
+                    <div class="space-y-4 mb-6">
+                        <div class="p-3 bg-purple-500/20 rounded-lg">
+                            <p class="text-purple-300 text-sm">ພະນັກງານ</p>
+                            <p class="text-white font-medium">${emp.fullName}</p>
+                            <p class="text-purple-300 text-sm">${emp.empCode}</p>
+                        </div>
+                        
+                        <div>
+                            <label class="text-purple-200 text-sm mb-2 block">PIN ໃໝ່ (4 ໂຕเລກ)</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="newPIN" maxlength="4" pattern="\\d{4}" value="${Math.floor(1000 + Math.random() * 9000)}"
+                                    class="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white text-center text-xl font-mono">
+                                <button type="button" onclick="generateRandomPIN()" class="px-4 py-2 bg-purple-500/30 hover:bg-purple-500/50 rounded-lg text-purple-200">
+                                    <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 bg-yellow-500/20 border border-yellow-400/50 rounded-lg">
+                            <p class="text-yellow-300 text-sm">⚠️ PIN ໃໝ່ຈະສະແດງພຽງ 1 ຄັ້ງ<br>ກະລຸນາບັນທຶກ ຫຼື ແຈ້ງໃຫ້ພະນັກງານທັນທີ</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeModal('resetPINModal')" 
+                            class="flex-1 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white">
+                            ຍົກເລີກ
+                        </button>
+                        <button type="button" onclick="handleResetPIN()"
+                            class="flex-1 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:opacity-90 rounded-lg text-white">
+                            ລີເຊັດ PIN
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('active');
+            lucide.createIcons();
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+            state.selectedEmployee = null;
+        }
+
+        // ====== ACTIONS ======
+        async function handleRegister(e) {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const data = {
+                empCode: formData.get('empCode'),
+                fullName: formData.get('fullName'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                position: formData.get('position'),
+                baseSalary: parseFloat(formData.get('baseSalary')) || 0,
+                pin: formData.get('pin'),
+                role: formData.get('role')
+            };
+
+            state.loading = true;
+            closeModal('registerModal');
+            render();
+
+            const result = await callAPI('registerEmployee', data);
+
+            if (result.success) {
+                state.success = '✅ ລົງທະບຽນພະນັກງານສຳເລັດ';
+                await loadEmployees();
+            } else {
+                state.error = '❌ ' + result.error;
+            }
+
+            state.loading = false;
+            render();
+
+            setTimeout(() => { state.success = ''; state.error = ''; render(); }, 3000);
+        }
+
+        async function handleEdit(e) {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const data = {
+                employeeId: state.selectedEmployee.id,
+                fullName: formData.get('fullName'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                position: formData.get('position'),
+                baseSalary: parseFloat(formData.get('baseSalary')),
+                role: formData.get('role'),
+                status: formData.get('status')
+            };
+
+            state.loading = true;
+            closeModal('editModal');
+            render();
+
+            const result = await callAPI('updateEmployee', data);
+
+            if (result.success) {
+                state.success = '✅ ອັບເດດຂໍ້ມູນສຳເລັດ';
+                await loadEmployees();
+            } else {
+                state.error = '❌ ' + result.error;
+            }
+
+            state.loading = false;
+            render();
+
+            setTimeout(() => { state.success = ''; state.error = ''; render(); }, 3000);
+        }
+
+        async function handleResetPIN() {
+            const newPIN = document.getElementById('newPIN').value;
+
+            if (!/^\d{4}$/.test(newPIN)) {
+                alert('PIN ຕ້ອງເປັນຕົວເລກ 4 ໂຕ');
+                return;
+            }
+
+            state.loading = true;
+            closeModal('resetPINModal');
+            render();
+
+            const result = await callAPI('resetPIN', {
+                employeeId: state.selectedEmployee.id,
+                newPIN: newPIN
+            });
+
+            if (result.success) {
+                alert(`✅ ລີເຊັດ PIN ສຳເລັດ!\n\nພະນັກງານ: ${result.employeeName}\nPIN ໃໝ່: ${result.newPIN}\n\nກະລຸນາແຈ້ງ PIN ນີ້ໃຫ້ພະນັກງານ`);
+                state.success = '✅ ລີເຊັດ PIN ສຳເລັດ';
+            } else {
+                state.error = '❌ ' + result.error;
+            }
+
+            state.loading = false;
+            render();
+
+            setTimeout(() => { state.success = ''; state.error = ''; render(); }, 3000);
+        }
+
+        async function deactivateEmployee(employeeId) {
+            if (!confirm('ທ່ານຕ້ອງການປິດການໃຊ້ງານພະນັກງານນີ້ບໍ່?')) return;
+
+            state.loading = true;
+            render();
+
+            const result = await callAPI('deleteEmployee', { employeeId });
+
+            if (result.success) {
+                state.success = '✅ ປິດການໃຊ້ງານສຳເລັດ';
+                await loadEmployees();
+            } else {
+                state.error = '❌ ' + result.error;
+            }
+
+            state.loading = false;
+            render();
+
+            setTimeout(() => { state.success = ''; state.error = ''; render(); }, 3000);
+        }
+
+        // ====== HELPERS ======
+        function generatePIN() {
+            const pin = Math.floor(1000 + Math.random() * 9000);
+            document.querySelector('input[name="pin"]').value = pin;
+        }
+
+        function generateRandomPIN() {
+            const pin = Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('newPIN').value = pin;
+        }
+
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        // ====== START ======
+        init();
+    </script>
+</body>
+
+</html>
