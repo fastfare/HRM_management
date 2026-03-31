@@ -1,0 +1,16 @@
+[
+  {
+    "id": "a04cc0f7-317b-4931-8501-8cf025932326",
+    "employeeId": "a2b42bd0-0f12-45be-8493-8f1f52971907",
+    "leaveType": "annual",
+    "startDate": "2026-01-31",
+    "endDate": "2026-01-31",
+    "days": 1,
+    "reason": "ລາພັກປະຈຳປີ",
+    "status": "approved",
+    "approvedBy": "2be739fb-dd14-44ed-b5ae-e2d901b86d11",
+    "approvedAt": "2026-01-30T11:10:57.022Z",
+    "rejectionReason": null,
+    "createdAt": "2026-01-30T10:56:31.542Z"
+  }
+]

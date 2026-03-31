@@ -1,5 +1,5 @@
 // Service Worker for HR Attendance PWA
-const CACHE_NAME = 'hr-attendance-v1';
+const CACHE_NAME = 'hr-attendance-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Resources to cache immediately
@@ -135,10 +135,10 @@ async function syncAttendance() {
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('hr-attendance-db', 1);
-    
+
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-    
+
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
       if (!db.objectStoreNames.contains('pending')) {

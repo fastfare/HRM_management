@@ -1,0 +1,578 @@
+import { useState } from 'react';
+import { Users, Clock, Calendar, DollarSign, BarChart3, Home, Bell, Settings, MapPin, Check, X, Download, FileSpreadsheet, Filter, Search, Eye, Edit, Trash2, ChevronRight, ChevronDown, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle, RefreshCw, Building2, PieChart, Activity, Zap, UserPlus, FileText, Mail, Printer } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart as RechartsPie, Pie, Cell } from 'recharts';
+
+export default function AdminPanel() {
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [selectedPeriod, setSelectedPeriod] = useState('today');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState('attendance');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+
+  // Mock Data
+  const stats = [
+    { label: 'ພະນັກງານທັງໝົດ', value: 20, icon: Users, change: '+2', trend: 'up', color: 'blue' },
+    { label: 'ເຂົ້າວຽກມື້ນີ້', value: 18, icon: CheckCircle, change: '90%', trend: 'up', color: 'green' },
+    { label: 'ມາສາຍ', value: 2, icon: AlertTriangle, change: '-1', trend: 'down', color: 'yellow' },
+    { label: 'ຂາດວຽກ/ລາ', value: 2, icon: XCircle, change: '0', trend: 'neutral', color: 'red' },
+  ];
+
+  const weeklyData = [
+    { day: 'ຈັນ', present: 19, late: 1, absent: 0 },
+    { day: 'ອັງຄານ', present: 18, late: 2, absent: 0 },
+    { day: 'ພຸດ', present: 17, late: 1, absent: 2 },
+    { day: 'ພະຫັດ', present: 20, late: 0, absent: 0 },
+    { day: 'ສຸກ', present: 18, late: 2, absent: 0 },
+  ];
+
+  const departmentData = [
+    { name: 'IT', value: 6, color: '#8b5cf6' },
+    { name: 'HR', value: 4, color: '#ec4899' },
+    { name: 'Finance', value: 5, color: '#f59e0b' },
+    { name: 'Sales', value: 5, color: '#10b981' },
+  ];
+
+  const employees = [
+    { id: 1, name: 'ສົມສັກ ແກ້ວມະນີ', dept: 'IT', checkIn: '08:02', checkOut: '-', status: 'working', avatar: 'ສ' },
+    { id: 2, name: 'ວິໄລ ພົມມະວົງ', dept: 'HR', checkIn: '08:35', checkOut: '-', status: 'late', avatar: 'ວ' },
+    { id: 3, name: 'ສຸກສະຫວັນ ໄຊຍະວົງ', dept: 'Finance', checkIn: '07:55', checkOut: '-', status: 'working', avatar: 'ສ' },
+    { id: 4, name: 'ນ້ອຍ ແສງຈັນ', dept: 'Sales', checkIn: '-', checkOut: '-', status: 'leave', avatar: 'ນ' },
+    { id: 5, name: 'ບຸນມີ ສີສະຫວາດ', dept: 'IT', checkIn: '08:10', checkOut: '-', status: 'working', avatar: 'ບ' },
+    { id: 6, name: 'ຄຳແພງ ວົງໄຊ', dept: 'HR', checkIn: '-', checkOut: '-', status: 'absent', avatar: 'ຄ' },
+  ];
+
+  const leaveRequests = [
+    { id: 1, name: 'ສົມສັກ', type: 'ລາພັກປະຈຳປີ', dates: '28-29 ມ.ກ.', days: 2, reason: 'ທຸລະສ່ວນຕົວ', status: 'pending' },
+    { id: 2, name: 'ວິໄລ', type: 'ລາປ່ວຍ', dates: '30 ມ.ກ.', days: 1, reason: 'ໄປຫາໝໍ', status: 'pending' },
+    { id: 3, name: 'ນ້ອຍ', type: 'ລາກິດ', dates: '25-26 ມ.ກ.', days: 2, reason: 'ງານແຕ່ງດອງ', status: 'approved' },
+  ];
+
+  const payrollSummary = [
+    { dept: 'IT Department', employees: 6, totalSalary: '51,000,000', status: 'pending' },
+    { dept: 'HR Department', employees: 4, totalSalary: '32,000,000', status: 'paid' },
+    { dept: 'Finance', employees: 5, totalSalary: '42,500,000', status: 'paid' },
+    { dept: 'Sales', employees: 5, totalSalary: '45,000,000', status: 'pending' },
+  ];
+
+  const handleExport = () => {
+    setIsExporting(true);
+    setTimeout(() => {
+      setIsExporting(false);
+      setExportSuccess(true);
+      setTimeout(() => {
+        setExportSuccess(false);
+        setShowExportModal(false);
+      }, 1500);
+    }, 2000);
+  };
+
+  const menus = [
+    { id: 'dashboard', icon: Home, label: 'Dashboard' },
+    { id: 'employees', icon: Users, label: 'ພະນັກງານ' },
+    { id: 'attendance', icon: Clock, label: 'ເຂົ້າ-ອອກວຽກ' },
+    { id: 'leaves', icon: Calendar, label: 'ອະນຸມັດລາ' },
+    { id: 'payroll', icon: DollarSign, label: 'ເງິນເດືອນ' },
+    { id: 'reports', icon: BarChart3, label: 'ລາຍງານ' },
+  ];
+
+  const exportOptions = [
+    { id: 'attendance', label: 'ລາຍງານເຂົ້າ-ອອກວຽກ', icon: Clock, desc: 'ບັນທຶກເວລາເຂົ້າ-ອອກທັງໝົດ' },
+    { id: 'employees', label: 'ຂໍ້ມູນພະນັກງານ', icon: Users, desc: 'ລາຍຊື່ ແລະ ຂໍ້ມູນພະນັກງານ' },
+    { id: 'leaves', label: 'ລາຍງານການລາ', icon: Calendar, desc: 'ປະຫວັດການຂໍລາທັງໝົດ' },
+    { id: 'payroll', label: 'ລາຍງານເງິນເດືອນ', icon: DollarSign, desc: 'ສະຫຼຸບເງິນເດືອນປະຈຳເດືອນ' },
+    { id: 'summary', label: 'ລາຍງານສະຫຼຸບ', icon: PieChart, desc: 'ສະຖິຕິລວມທັງໝົດ' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#0f0f1a] flex">
+      {/* Sidebar */}
+      <div className="w-64 bg-[#1a1a2e] border-r border-white/10 flex flex-col">
+        {/* Logo */}
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-white font-bold">HR Admin</h1>
+              <p className="text-white/50 text-xs">Management System</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Menu */}
+        <div className="flex-1 p-3 space-y-1">
+          {menus.map((menu) => (
+            <button
+              key={menu.id}
+              onClick={() => setActiveMenu(menu.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeMenu === menu.id
+                  ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white'
+                  : 'text-white/60 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <menu.icon className="w-5 h-5" />
+              <span>{menu.label}</span>
+              {menu.id === 'leaves' && (
+                <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">2</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Export Button */}
+        <div className="p-3 border-t border-white/10">
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg hover:shadow-green-500/30 transition-all"
+          >
+            <FileSpreadsheet className="w-5 h-5" />
+            <span className="font-medium">Export Excel</span>
+          </button>
+        </div>
+
+        {/* Admin Info */}
+        <div className="p-4 border-t border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-600 rounded-full flex items-center justify-center text-white font-bold">
+              A
+            </div>
+            <div className="flex-1">
+              <p className="text-white text-sm font-medium">Admin</p>
+              <p className="text-white/50 text-xs">ຜູ້ດູແລລະບົບ</p>
+            </div>
+            <Settings className="w-5 h-5 text-white/50" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-[#1a1a2e] border-b border-white/10 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-white text-xl font-bold">
+                {menus.find(m => m.id === activeMenu)?.label || 'Dashboard'}
+              </h2>
+              <p className="text-white/50 text-sm">ວັນຈັນ, 27 ມັງກອນ 2025</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {/* Period Filter */}
+              <div className="flex bg-white/5 rounded-xl p-1">
+                {['today', 'week', 'month'].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setSelectedPeriod(p)}
+                    className={`px-4 py-2 rounded-lg text-sm transition-all ${
+                      selectedPeriod === p
+                        ? 'bg-violet-600 text-white'
+                        : 'text-white/60 hover:text-white'
+                    }`}
+                  >
+                    {p === 'today' ? 'ມື້ນີ້' : p === 'week' ? 'ອາທິດ' : 'ເດືອນ'}
+                  </button>
+                ))}
+              </div>
+              
+              <button className="p-2 bg-white/5 rounded-xl text-white/60 hover:text-white">
+                <RefreshCw className="w-5 h-5" />
+              </button>
+              
+              <button className="relative p-2 bg-white/5 rounded-xl text-white/60 hover:text-white">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-6">
+          {activeMenu === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-4 gap-4">
+                {stats.map((stat, i) => (
+                  <div key={i} className="bg-[#1a1a2e] rounded-2xl p-5 border border-white/10">
+                    <div className="flex items-start justify-between">
+                      <div className={`p-3 rounded-xl bg-${stat.color}-500/20`}>
+                        <stat.icon className={`w-6 h-6 text-${stat.color}-400`} />
+                      </div>
+                      <div className={`flex items-center gap-1 text-sm ${
+                        stat.trend === 'up' ? 'text-green-400' : 
+                        stat.trend === 'down' ? 'text-red-400' : 'text-white/50'
+                      }`}>
+                        {stat.trend === 'up' && <TrendingUp className="w-4 h-4" />}
+                        {stat.trend === 'down' && <TrendingDown className="w-4 h-4" />}
+                        {stat.change}
+                      </div>
+                    </div>
+                    <p className="text-3xl font-bold text-white mt-3">{stat.value}</p>
+                    <p className="text-white/50 text-sm mt-1">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Charts Row */}
+              <div className="grid grid-cols-3 gap-4">
+                {/* Weekly Chart */}
+                <div className="col-span-2 bg-[#1a1a2e] rounded-2xl p-5 border border-white/10">
+                  <h3 className="text-white font-semibold mb-4">📊 ສະຖິຕິປະຈຳອາທິດ</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={weeklyData}>
+                        <XAxis dataKey="day" stroke="#ffffff50" fontSize={12} />
+                        <YAxis stroke="#ffffff50" fontSize={12} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #ffffff20', borderRadius: '12px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                        <Bar dataKey="present" fill="#10b981" radius={[4, 4, 0, 0]} name="ມາເຮັດວຽກ" />
+                        <Bar dataKey="late" fill="#f59e0b" radius={[4, 4, 0, 0]} name="ມາສາຍ" />
+                        <Bar dataKey="absent" fill="#ef4444" radius={[4, 4, 0, 0]} name="ຂາດ" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Department Pie */}
+                <div className="bg-[#1a1a2e] rounded-2xl p-5 border border-white/10">
+                  <h3 className="text-white font-semibold mb-4">👥 ພະນັກງານຕາມພະແນກ</h3>
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie>
+                        <Pie
+                          data={departmentData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {departmentData.map((entry, index) => (
+                            <Cell key={index} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {departmentData.map((d, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }}></div>
+                        <span className="text-white/70 text-xs">{d.name}: {d.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Activity & Pending */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Live Attendance */}
+                <div className="bg-[#1a1a2e] rounded-2xl p-5 border border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                      <Activity className="w-5 h-5 text-green-400" />
+                      ສະຖານະ Real-time
+                    </h3>
+                    <span className="text-green-400 text-sm animate-pulse">● Live</span>
+                  </div>
+                  <div className="space-y-3 max-h-64 overflow-auto">
+                    {employees.slice(0, 5).map((emp) => (
+                      <div key={emp.id} className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                          emp.status === 'working' ? 'bg-green-500' :
+                          emp.status === 'late' ? 'bg-yellow-500' :
+                          emp.status === 'leave' ? 'bg-purple-500' : 'bg-red-500'
+                        }`}>
+                          {emp.avatar}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-white text-sm font-medium">{emp.name}</p>
+                          <p className="text-white/50 text-xs">{emp.dept}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white text-sm">{emp.checkIn || '-'}</p>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            emp.status === 'working' ? 'bg-green-500/20 text-green-400' :
+                            emp.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' :
+                            emp.status === 'leave' ? 'bg-purple-500/20 text-purple-400' : 
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {emp.status === 'working' ? 'ເຮັດວຽກ' : 
+                             emp.status === 'late' ? 'ສາຍ' :
+                             emp.status === 'leave' ? 'ລາພັກ' : 'ຂາດ'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pending Approvals */}
+                <div className="bg-[#1a1a2e] rounded-2xl p-5 border border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                      ລໍຖ້າອະນຸມັດ
+                    </h3>
+                    <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">2 ລາຍການ</span>
+                  </div>
+                  <div className="space-y-3">
+                    {leaveRequests.filter(r => r.status === 'pending').map((req) => (
+                      <div key={req.id} className="p-4 bg-white/5 rounded-xl border border-white/10">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="text-white font-medium">{req.name}</p>
+                            <p className="text-purple-400 text-sm">{req.type}</p>
+                          </div>
+                          <span className="bg-yellow-500/20 text-yellow-400 text-xs px-2 py-1 rounded-full">ລໍຖ້າ</span>
+                        </div>
+                        <p className="text-white/60 text-sm mb-3">📅 {req.dates} ({req.days} ມື້)</p>
+                        <div className="flex gap-2">
+                          <button className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm flex items-center justify-center gap-1 transition-colors">
+                            <Check className="w-4 h-4" /> ອະນຸມັດ
+                          </button>
+                          <button className="flex-1 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm flex items-center justify-center gap-1 transition-colors">
+                            <X className="w-4 h-4" /> ປະຕິເສດ
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'attendance' && (
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="flex gap-3">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+                  <input 
+                    placeholder="ຄົ້ນຫາພະນັກງານ..." 
+                    className="w-full bg-[#1a1a2e] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-white/50 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <button className="px-4 py-3 bg-[#1a1a2e] border border-white/10 rounded-xl text-white/70 flex items-center gap-2 hover:border-violet-500">
+                  <Filter className="w-5 h-5" />
+                  ກັ່ນຕອງ
+                </button>
+                <button 
+                  onClick={() => setShowExportModal(true)}
+                  className="px-4 py-3 bg-green-500 text-white rounded-xl flex items-center gap-2 hover:bg-green-600"
+                >
+                  <Download className="w-5 h-5" />
+                  Export Excel
+                </button>
+              </div>
+
+              {/* Table */}
+              <div className="bg-[#1a1a2e] rounded-2xl border border-white/10 overflow-hidden">
+                <div className="grid grid-cols-7 gap-4 p-4 bg-white/5 text-white/60 text-sm font-medium">
+                  <span>ພະນັກງານ</span>
+                  <span>ພະແນກ</span>
+                  <span>ເຂົ້າວຽກ</span>
+                  <span>ອອກວຽກ</span>
+                  <span>ຊົ່ວໂມງ</span>
+                  <span>ສະຖານະ</span>
+                  <span className="text-center">ຈັດການ</span>
+                </div>
+                {employees.map((emp) => (
+                  <div key={emp.id} className="grid grid-cols-7 gap-4 p-4 border-t border-white/10 items-center hover:bg-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
+                        emp.status === 'working' ? 'bg-green-500' :
+                        emp.status === 'late' ? 'bg-yellow-500' :
+                        emp.status === 'leave' ? 'bg-purple-500' : 'bg-red-500'
+                      }`}>
+                        {emp.avatar}
+                      </div>
+                      <span className="text-white">{emp.name}</span>
+                    </div>
+                    <span className="text-white/70">{emp.dept}</span>
+                    <span className="text-white">{emp.checkIn || '-'}</span>
+                    <span className="text-white">{emp.checkOut || '-'}</span>
+                    <span className="text-white">{emp.checkIn !== '-' ? '8.5 ຊມ' : '-'}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs w-fit ${
+                      emp.status === 'working' ? 'bg-green-500/20 text-green-400' :
+                      emp.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' :
+                      emp.status === 'leave' ? 'bg-purple-500/20 text-purple-400' : 
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {emp.status === 'working' ? 'ປົກກະຕິ' : 
+                       emp.status === 'late' ? 'ມາສາຍ' :
+                       emp.status === 'leave' ? 'ລາພັກ' : 'ຂາດວຽກ'}
+                    </span>
+                    <div className="flex justify-center gap-2">
+                      <button className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button className="p-2 hover:bg-white/10 rounded-lg text-yellow-400">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'reports' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-3 gap-4">
+                {exportOptions.map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => { setExportType(opt.id); setShowExportModal(true); }}
+                    className="bg-[#1a1a2e] rounded-2xl p-6 border border-white/10 text-left hover:border-violet-500 transition-all group"
+                  >
+                    <div className="p-3 bg-violet-500/20 rounded-xl w-fit group-hover:bg-violet-500/30">
+                      <opt.icon className="w-6 h-6 text-violet-400" />
+                    </div>
+                    <h3 className="text-white font-semibold mt-4">{opt.label}</h3>
+                    <p className="text-white/50 text-sm mt-1">{opt.desc}</p>
+                    <div className="flex items-center gap-2 mt-4 text-green-400 text-sm">
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Export Excel
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeMenu === 'payroll' && (
+            <div className="space-y-4">
+              {/* Summary Card */}
+              <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-2xl p-6 text-white">
+                <p className="text-sm opacity-80">ເງິນເດືອນລວມ - ມັງກອນ 2025</p>
+                <p className="text-4xl font-bold mt-2">₭ 170,500,000</p>
+                <p className="text-sm opacity-80 mt-1">20 ພະນັກງານ</p>
+              </div>
+
+              {/* Payroll Table */}
+              <div className="bg-[#1a1a2e] rounded-2xl border border-white/10 overflow-hidden">
+                <div className="grid grid-cols-5 gap-4 p-4 bg-white/5 text-white/60 text-sm font-medium">
+                  <span>ພະແນກ</span>
+                  <span>ຈຳນວນພະນັກງານ</span>
+                  <span>ເງິນເດືອນລວມ</span>
+                  <span>ສະຖານະ</span>
+                  <span className="text-center">ຈັດການ</span>
+                </div>
+                {payrollSummary.map((dept, i) => (
+                  <div key={i} className="grid grid-cols-5 gap-4 p-4 border-t border-white/10 items-center">
+                    <span className="text-white font-medium">{dept.dept}</span>
+                    <span className="text-white/70">{dept.employees} ຄົນ</span>
+                    <span className="text-white">₭ {dept.totalSalary}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs w-fit ${
+                      dept.status === 'paid' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                    }`}>
+                      {dept.status === 'paid' ? 'ຈ່າຍແລ້ວ' : 'ລໍຖ້າ'}
+                    </span>
+                    <div className="flex justify-center gap-2">
+                      <button className="px-3 py-1 bg-green-500/20 text-green-400 rounded-lg text-sm hover:bg-green-500/30">
+                        ຈ່າຍເງິນ
+                      </button>
+                      <button className="p-2 hover:bg-white/10 rounded-lg text-blue-400">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#1a1a2e] rounded-3xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+            {!isExporting && !exportSuccess ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-white text-xl font-bold flex items-center gap-2">
+                    <FileSpreadsheet className="w-6 h-6 text-green-400" />
+                    Export to Excel
+                  </h3>
+                  <button onClick={() => setShowExportModal(false)} className="text-white/50 hover:text-white">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  {exportOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setExportType(opt.id)}
+                      className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                        exportType === opt.id
+                          ? 'bg-violet-500/20 border-violet-500'
+                          : 'bg-white/5 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      <opt.icon className={`w-5 h-5 ${exportType === opt.id ? 'text-violet-400' : 'text-white/50'}`} />
+                      <div className="text-left flex-1">
+                        <p className="text-white text-sm font-medium">{opt.label}</p>
+                        <p className="text-white/50 text-xs">{opt.desc}</p>
+                      </div>
+                      {exportType === opt.id && <Check className="w-5 h-5 text-violet-400" />}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-3 mb-6">
+                  <p className="text-white/60 text-sm">ເລືອກຊ່ວງເວລາ:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['ມື້ນີ້', 'ອາທິດນີ້', 'ເດືອນນີ້'].map((p, i) => (
+                      <button
+                        key={i}
+                        className={`py-2 px-3 rounded-lg text-sm ${
+                          i === 2 ? 'bg-violet-500 text-white' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleExport}
+                  className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-500/30 transition-all"
+                >
+                  <Download className="w-5 h-5" />
+                  ດາວໂຫຼດ Excel File
+                </button>
+              </>
+            ) : isExporting ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-white font-medium">ກຳລັງສ້າງໄຟລ໌ Excel...</p>
+                <p className="text-white/50 text-sm mt-1">ກະລຸນາລໍຖ້າ</p>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 mx-auto mb-4 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="w-8 h-8 text-white" />
+                </div>
+                <p className="text-white font-medium">ສ້າງໄຟລ໌ສຳເລັດ!</p>
+                <p className="text-green-400 text-sm mt-1">attendance_report_2025.xlsx</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

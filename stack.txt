@@ -1,0 +1,203 @@
+import { useState } from 'react';
+import { Users, Clock, Calendar, DollarSign, Award, GraduationCap, FileText, BarChart3, Database, Server, Smartphone, Shield, Check, Globe, Layers } from 'lucide-react';
+
+export default function HRSystemOverview() {
+  const [activeTab, setActiveTab] = useState('modules');
+
+  const hrModules = [
+    { id: 'employee', name: 'ຂໍ້ມູນພະນັກງານ', icon: Users, color: 'from-blue-500 to-cyan-500', desc: 'ປະຫວັດ, ເອກະສານ, ສັນຍາ' },
+    { id: 'attendance', name: 'ເຂົ້າ-ອອກວຽກ', icon: Clock, color: 'from-green-500 to-emerald-500', desc: 'GPS Geofencing, ລາຍງານ' },
+    { id: 'leave', name: 'ການຂໍລາ', icon: Calendar, color: 'from-purple-500 to-pink-500', desc: 'ລາພັກ, ລາປ່ວຍ, ອະນຸມັດ' },
+    { id: 'payroll', name: 'ເງິນເດືອນ', icon: DollarSign, color: 'from-yellow-500 to-orange-500', desc: 'ຄຳນວນເງິນ, ພາສີ, ສະລິບ' },
+    { id: 'recruit', name: 'ຮັບສະໝັກ', icon: FileText, color: 'from-indigo-500 to-purple-500', desc: 'ປະກາດ, ສຳພາດ, ຈ້າງງານ' },
+    { id: 'performance', name: 'ປະເມີນຜົນ', icon: Award, color: 'from-red-500 to-pink-500', desc: 'KPI, 360 Feedback' },
+    { id: 'training', name: 'ຝຶກອົບຮົມ', icon: GraduationCap, color: 'from-teal-500 to-cyan-500', desc: 'ຫຼັກສູດ, ຕິດຕາມ' },
+    { id: 'report', name: 'ລາຍງານ', icon: BarChart3, color: 'from-gray-500 to-slate-600', desc: 'Dashboard, Export' },
+  ];
+
+  const techStack = [
+    {
+      layer: 'Mobile App',
+      icon: Smartphone,
+      color: 'from-blue-500 to-indigo-600',
+      techs: [
+        { name: 'Flutter', desc: 'Cross-platform (Android + iOS)', license: 'BSD-3', cost: 'ຟຣີ 100%' },
+        { name: 'SQLite', desc: 'Local Database', license: 'Public Domain', cost: 'ຟຣີ 100%' },
+      ]
+    },
+    {
+      layer: 'Backend API',
+      icon: Server,
+      color: 'from-green-500 to-emerald-600',
+      techs: [
+        { name: 'Node.js + NestJS', desc: 'API Framework', license: 'MIT', cost: 'ຟຣີ 100%' },
+        { name: 'Python + FastAPI', desc: 'Microservices', license: 'MIT', cost: 'ຟຣີ 100%' },
+      ]
+    },
+    {
+      layer: 'Database',
+      icon: Database,
+      color: 'from-purple-500 to-pink-600',
+      techs: [
+        { name: 'PostgreSQL', desc: 'Main Database', license: 'PostgreSQL', cost: 'ຟຣີ 100%' },
+        { name: 'Redis', desc: 'Cache & Session', license: 'BSD-3', cost: 'ຟຣີ 100%' },
+        { name: 'MinIO', desc: 'File Storage (S3 Compatible)', license: 'AGPL-3.0', cost: 'ຟຣີ 100%' },
+      ]
+    },
+    {
+      layer: 'Infrastructure',
+      icon: Layers,
+      color: 'from-orange-500 to-red-600',
+      techs: [
+        { name: 'Docker + Compose', desc: 'Containerization', license: 'Apache 2.0', cost: 'ຟຣີ 100%' },
+        { name: 'Nginx', desc: 'Reverse Proxy', license: 'BSD-2', cost: 'ຟຣີ 100%' },
+        { name: 'Traefik', desc: 'API Gateway', license: 'MIT', cost: 'ຟຣີ 100%' },
+      ]
+    },
+    {
+      layer: 'Security & Auth',
+      icon: Shield,
+      color: 'from-red-500 to-pink-600',
+      techs: [
+        { name: 'Keycloak', desc: 'Identity & Access Management', license: 'Apache 2.0', cost: 'ຟຣີ 100%' },
+        { name: 'Let\'s Encrypt', desc: 'SSL Certificate', license: 'Open', cost: 'ຟຣີ 100%' },
+      ]
+    },
+    {
+      layer: 'External Services',
+      icon: Globe,
+      color: 'from-cyan-500 to-blue-600',
+      techs: [
+        { name: 'OpenStreetMap + Leaflet', desc: 'Maps & Geolocation', license: 'ODbL / BSD-2', cost: 'ຟຣີ 100%' },
+        { name: 'ntfy.sh / Gotify', desc: 'Push Notification', license: 'Apache 2.0', cost: 'ຟຣີ 100%' },
+        { name: 'Grafana + Prometheus', desc: 'Monitoring', license: 'AGPL-3.0', cost: 'ຟຣີ 100%' },
+      ]
+    },
+  ];
+
+  const costComparison = [
+    { item: 'Mobile Development', proprietary: '$15,000-30,000', opensource: '$0' },
+    { item: 'Backend Framework', proprietary: '$5,000-10,000/year', opensource: '$0' },
+    { item: 'Database License', proprietary: '$2,000-20,000/year', opensource: '$0' },
+    { item: 'Cloud Storage', proprietary: '$100-500/month', opensource: '$0 (self-hosted)' },
+    { item: 'Auth Service', proprietary: '$500-2,000/month', opensource: '$0' },
+    { item: 'Maps API', proprietary: '$200-1,000/month', opensource: '$0' },
+    { item: 'Server (VPS)', proprietary: '-', opensource: '$20-100/month' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4">
+      <div className="text-center mb-5">
+        <h1 className="text-xl font-bold text-white mb-1">🏢 Full HR Management System</h1>
+        <p className="text-indigo-300 text-sm">100% Open Source & Free</p>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-2 mb-4">
+        {[
+          { id: 'modules', label: '📦 Modules' },
+          { id: 'tech', label: '🛠️ Tech Stack' },
+          { id: 'cost', label: '💰 ປຽບທຽບຄ່າໃຊ້ຈ່າຍ' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all ${
+              activeTab === tab.id
+                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                : 'bg-white/10 text-white/70'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Modules Tab */}
+      {activeTab === 'modules' && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            {hrModules.map((m) => (
+              <div key={m.id} className={`bg-gradient-to-br ${m.color} rounded-xl p-3 text-white`}>
+                <m.icon className="w-6 h-6 mb-2" />
+                <h3 className="font-bold text-sm">{m.name}</h3>
+                <p className="text-white/80 text-xs">{m.desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4 mt-4">
+            <h4 className="text-green-400 font-bold mb-2">✅ ລະບົບຄົບຖ້ວນ</h4>
+            <p className="text-green-200 text-sm">ຄວບຄຸມທຸກດ້ານຂອງ HR ຕັ້ງແຕ່ຮັບສະໝັກ ຈົນເຖິງເງິນເດືອນ</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tech Stack Tab */}
+      {activeTab === 'tech' && (
+        <div className="space-y-3">
+          {techStack.map((layer, idx) => (
+            <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-3">
+              <div className={`flex items-center gap-2 mb-3`}>
+                <div className={`p-2 rounded-lg bg-gradient-to-br ${layer.color}`}>
+                  <layer.icon className="w-4 h-4 text-white" />
+                </div>
+                <h3 className="text-white font-bold text-sm">{layer.layer}</h3>
+              </div>
+              <div className="space-y-2">
+                {layer.techs.map((t, i) => (
+                  <div key={i} className="bg-white/5 rounded-lg p-2 flex justify-between items-center">
+                    <div>
+                      <p className="text-white text-sm font-medium">{t.name}</p>
+                      <p className="text-white/60 text-xs">{t.desc}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded-full">{t.cost}</span>
+                      <p className="text-white/40 text-xs mt-1">{t.license}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Cost Comparison Tab */}
+      {activeTab === 'cost' && (
+        <div className="space-y-3">
+          <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+            <div className="grid grid-cols-3 bg-white/10 p-2 text-xs font-bold">
+              <span className="text-white">ລາຍການ</span>
+              <span className="text-red-400 text-center">Proprietary</span>
+              <span className="text-green-400 text-center">Open Source</span>
+            </div>
+            {costComparison.map((c, i) => (
+              <div key={i} className="grid grid-cols-3 p-2 text-xs border-t border-white/5">
+                <span className="text-white/80">{c.item}</span>
+                <span className="text-red-300 text-center">{c.proprietary}</span>
+                <span className="text-green-300 text-center font-bold">{c.opensource}</span>
+              </div>
+            ))}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 text-center">
+              <p className="text-red-300 text-xs">Proprietary ຕໍ່ປີ</p>
+              <p className="text-red-400 text-xl font-bold">$25,000+</p>
+            </div>
+            <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-3 text-center">
+              <p className="text-green-300 text-xs">Open Source ຕໍ່ປີ</p>
+              <p className="text-green-400 text-xl font-bold">$240-1,200</p>
+              <p className="text-green-300 text-xs">(ຄ່າ Server ເທົ່ານັ້ນ)</p>
+            </div>
+          </div>
+
+          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-xl p-3">
+            <h4 className="text-yellow-400 font-bold text-sm mb-1">💡 ປະຢັດໄດ້ 95%+</h4>
+            <p className="text-yellow-200 text-xs">ໃຊ້ Open Source ຈ່າຍແຕ່ຄ່າ Server VPS ເທົ່ານັ້ນ!</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

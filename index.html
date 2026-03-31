@@ -20,16 +20,82 @@
 
     * {
       font-family: 'Noto Sans Lao', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-text-size-adjust: 100%;
     }
 
     body {
       background: linear-gradient(135deg, #0f172a 0%, #581c87 50%, #0f172a 100%);
       min-height: 100vh;
+      min-height: 100dvh;
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
     }
 
     .glass {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Mobile touch feedback */
+    .touch-btn {
+      transition: transform 0.1s ease, opacity 0.1s ease;
+    }
+
+    .touch-btn:active {
+      transform: scale(0.96);
+      opacity: 0.85;
+    }
+
+    /* Bottom nav safe area */
+    .bottom-nav {
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    /* Prevent text selection on UI elements */
+    button,
+    .tab-btn,
+    [role="button"] {
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Smooth scrollable content */
+    .scroll-content {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+    }
+
+    /* Custom scrollbar (thin on mobile) */
+    .scroll-content::-webkit-scrollbar {
+      width: 2px;
+    }
+
+    .scroll-content::-webkit-scrollbar-thumb {
+      background: rgba(139, 92, 246, 0.3);
+      border-radius: 4px;
+    }
+
+    /* Input focus zoom prevention on iOS */
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+
+    /* PWA standalone mode */
+    @media (display-mode: standalone) {
+      body {
+        padding-top: env(safe-area-inset-top);
+      }
     }
   </style>
 </head>
@@ -38,29 +104,33 @@
   <div id="app"></div>
 
   <script>
-    // ====== CONFIG - ປ່ຽນຕາມຫ້ອງການຂອງທ່ານ ======
+    // ====== CONFIG ======
     const CONFIG = {
-      // ✅ Apps Script API URL (v3 - Production Ready)
-      API_URL: 'https://script.google.com/macros/s/AKfycbycOiN5w_UWkqVCaGen6vkxhZKyNczs1BpiN_BIzhScd9Eq1AkEzPh5Ic8AQbBRMiqk/exec',
-
-      OFFICE_LAT: 17.962501366620828,    // Latitude ຫ້ອງການ (ອັບເດດແລ້ວ)
-      OFFICE_LNG: 102.64169714794403,   // Longitude ຫ້ອງການ (ອັບເດດແລ້ວ)
-      RADIUS: 100             // ລັດສະໝີ (ແມັດ)
+      API_URL: window.location.origin,
+      OFFICE_LAT: 17.872417,
+      OFFICE_LNG: 102.653306,
+      RADIUS: 100
     };
+  </script>
 
-    // ====== API CLIENT ======
-    async function callAPI(action, data = {}) {
+  <!-- Employee Leave Module -->
+  <script src="js/employee-leave.js"></script>
+
+  <script>
+    async function callAPI(endpoint, data = {}, method = 'POST') {
       try {
-        const response = await fetch(CONFIG.API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, ...data })
-        });
+        const url = `${CONFIG.API_URL}${endpoint}`;
+        const options = {
+          method,
+          headers: { 'Content-Type': 'application/json' }
+        };
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+        if (method === 'POST' || method === 'PUT') {
+          options.body = JSON.stringify(data);
         }
 
+        const response = await fetch(url, options);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return await response.json();
       } catch (error) {
         console.error('API Error:', error);
@@ -69,6 +139,24 @@
     }
 
     // ====== STATE ======
+    const USER_SHIFT_ASSIGNMENTS = {
+      'Panoy': 'morning',
+      'Add': 'standard',
+      'Souk': 'evening'
+    };
+
+    const SHIFT_RULES = {
+      off: { label: 'ວັນພັກ', inTime: null, outTime: null, lateThreshold: null },
+      morning: { label: '08:00 - 17:00', inTime: '08:00:00', outTime: '17:00:00', lateThreshold: '08:15:00' },
+      standard: { label: '09:00 - 18:00', inTime: '09:00:00', outTime: '18:00:00', lateThreshold: '09:15:00' },
+      evening: { label: '10:00 - 19:00', inTime: '10:00:00', outTime: '19:00:00', lateThreshold: '10:15:00' }
+    };
+
+    function getUserShiftType(user) {
+      if (!user) return 'standard';
+      return USER_SHIFT_ASSIGNMENTS[user.fullName] || user.shiftType || 'standard';
+    }
+
     let state = {
       screen: 'login',
       tab: 'home',
@@ -79,8 +167,10 @@
       location: null,
       distance: null,
       locationStatus: 'idle',
-      todayAttendance: { checkIn: null, checkOut: null },
-      history: []
+      todayAttendance: { checkIn: null, checkOut: null, status: null, shiftType: null },
+      history: [],
+      monthlyStats: { present: 0, late: 0, absent: 0 },
+      myLeaves: []
     };
 
     // ====== UTILITIES ======
@@ -120,26 +210,30 @@
             </div>
             
             <div class="glass rounded-2xl p-6 border border-white/20">
-              <div class="space-y-4">
+              <form id="loginForm" class="space-y-4">
                 <div>
                   <label class="text-purple-200 text-sm mb-1 block">ລະຫັດພະນັກງານ</label>
-                  <input type="text" id="empId" value="EMP001" 
+                  <input type="text" id="empId" placeholder="ກະລຸນາໃສ່ລະຫັດພະນັກງານ" 
                     class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500">
                 </div>
                 <div>
                   <label class="text-purple-200 text-sm mb-1 block">PIN</label>
-                  <input type="password" id="pin" value="1234" maxlength="4"
-                    class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                  <div class="relative">
+                    <input type="password" id="pin" placeholder="ໃສ່ PIN 4 ໂຕ" maxlength="4"
+                      class="w-full px-4 py-3 pr-12 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <button type="button" id="togglePinBtn" class="absolute right-3 top-1/2 -translate-y-1/2 text-purple-300 hover:text-white transition">
+                      <i id="eyeIcon" data-lucide="eye" class="w-5 h-5"></i>
+                    </button>
+                  </div>
                 </div>
                 
                 ${state.error ? `<p class="text-red-400 text-sm text-center">${state.error}</p>` : ''}
                 
-                <button id="loginBtn" class="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:opacity-90 transition">
+                <button type="submit" id="loginBtn" class="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:opacity-90 transition">
                   <i data-lucide="log-in" class="w-5 h-5"></i>
                   ${state.loading ? 'ກຳລັງເຂົ້າສູ່ລະບົບ...' : 'ເຂົ້າສູ່ລະບົບ'}
                 </button>
-              </div>
-              <p class="text-center text-purple-300/60 text-xs mt-4">Demo: PIN = 1234</p>
+              </form>
             </div>
           </div>
         </div>
@@ -149,39 +243,45 @@
     function renderMain() {
       return `
         <!-- Header -->
-        <div class="glass border-b border-white/10 px-4 py-4">
+        <div class="glass border-b border-white/10 px-4 py-3 sticky top-0 z-40">
           <div class="flex items-center justify-between">
-            <div>
-              <p class="text-white font-semibold">${state.user?.name || ''}</p>
-              <p class="text-purple-300 text-xs">${state.user?.position || ''}</p>
+            <div class="min-w-0 flex-1">
+              <p class="text-white font-semibold text-base truncate">${state.user?.fullName || state.user?.name || ''}</p>
+              <p class="text-purple-300 text-xs truncate">${state.user?.position || ''} · ${state.user?.department || state.user?.dept || ''}</p>
             </div>
-            <button class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+            <button class="w-11 h-11 bg-white/10 rounded-full flex items-center justify-center touch-btn flex-shrink-0 ml-3">
               <i data-lucide="bell" class="w-5 h-5 text-white"></i>
             </button>
           </div>
         </div>
 
         <!-- Content -->
-        <div class="p-4 pb-24">
+        <div class="px-4 pt-3 pb-28 scroll-content" style="min-height: calc(100dvh - 120px);">
           ${state.tab === 'home' ? renderHome() : ''}
           ${state.tab === 'history' ? renderHistory() : ''}
+          ${state.tab === 'leave' ? renderLeaveTab() : ''}
           ${state.tab === 'profile' ? renderProfile() : ''}
         </div>
 
         <!-- Bottom Nav -->
-        <div class="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-filter backdrop-blur-lg border-t border-white/10 px-4 py-2">
-          <div class="flex justify-around">
-            <button data-tab="home" class="tab-btn flex flex-col items-center py-2 px-4 rounded-xl ${state.tab === 'home' ? 'text-purple-400' : 'text-white/50'}">
-              <i data-lucide="home" class="w-6 h-6"></i>
-              <span class="text-xs mt-1">ໜ້າຫຼັກ</span>
+        <div class="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-filter backdrop-blur-xl border-t border-white/10 bottom-nav z-50">
+          <div class="flex justify-around px-2 pt-2">
+            <button data-tab="home" class="tab-btn touch-btn flex flex-col items-center py-2 px-4 rounded-2xl min-w-[60px] ${state.tab === 'home' ? 'text-purple-400 bg-purple-500/10' : 'text-white/40'}">
+              <i data-lucide="home" class="w-5 h-5"></i>
+              <span class="text-[10px] mt-1 font-medium">ໜ້າຫຼັກ</span>
             </button>
-            <button data-tab="history" class="tab-btn flex flex-col items-center py-2 px-4 rounded-xl ${state.tab === 'history' ? 'text-purple-400' : 'text-white/50'}">
-              <i data-lucide="history" class="w-6 h-6"></i>
-              <span class="text-xs mt-1">ປະຫວັດ</span>
+            <button data-tab="history" class="tab-btn touch-btn flex flex-col items-center py-2 px-4 rounded-2xl min-w-[60px] ${state.tab === 'history' ? 'text-purple-400 bg-purple-500/10' : 'text-white/40'}">
+              <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
+              <span class="text-[10px] mt-1 font-medium">ສະຫຼຸບ</span>
             </button>
-            <button data-tab="profile" class="tab-btn flex flex-col items-center py-2 px-4 rounded-xl ${state.tab === 'profile' ? 'text-purple-400' : 'text-white/50'}">
-              <i data-lucide="user-circle" class="w-6 h-6"></i>
-              <span class="text-xs mt-1">ໂປຣໄຟລ໌</span>
+            <button data-tab="leave" class="tab-btn touch-btn flex flex-col items-center py-2 px-4 rounded-2xl min-w-[60px] relative ${state.tab === 'leave' ? 'text-purple-400 bg-purple-500/10' : 'text-white/40'}">
+              <i data-lucide="calendar" class="w-5 h-5"></i>
+              <span class="text-[10px] mt-1 font-medium">ການລາ</span>
+              ${state.myLeaves.filter(l => l.status === 'pending').length > 0 ? `<span class="absolute top-1 right-3 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></span>` : ''}
+            </button>
+            <button data-tab="profile" class="tab-btn touch-btn flex flex-col items-center py-2 px-4 rounded-2xl min-w-[60px] ${state.tab === 'profile' ? 'text-purple-400 bg-purple-500/10' : 'text-white/40'}">
+              <i data-lucide="user-circle" class="w-5 h-5"></i>
+              <span class="text-[10px] mt-1 font-medium">ໂປຣໄຟລ໌</span>
             </button>
           </div>
         </div>
@@ -232,6 +332,7 @@
                 <p class="text-white font-bold text-lg">${state.todayAttendance.checkOut || '--:--'}</p>
               </div>
             </div>
+            <p class="text-xs text-white/70 mt-2">ເວລາງານ: ${SHIFT_RULES[state.todayAttendance.shiftType || getUserShiftType(state.user)].label}</p>
           </div>
 
           <!-- Location -->
@@ -241,8 +342,8 @@
                 <i data-lucide="map-pin" class="w-5 h-5 ${locIcon}"></i>
                 <span class="text-white font-medium">ຕຳແໜ່ງປັດຈຸບັນ</span>
               </div>
-              <button id="checkLocationBtn" class="px-3 py-1 bg-purple-500/30 text-purple-200 rounded-lg text-sm hover:bg-purple-500/50">
-                ${state.locationStatus === 'loading' ? 'ກຳລັງກວດ...' : 'ກວດສອບ'}
+              <button id="checkLocationBtn" class="touch-btn px-4 py-2 bg-purple-500/30 text-purple-200 rounded-xl text-sm active:bg-purple-500/50">
+                ${state.locationStatus === 'loading' ? 'ກຳລັງກວດ...' : 'ກວດສອບ GPS'}
               </button>
             </div>
             ${state.locationStatus !== 'idle' ? `
@@ -258,16 +359,16 @@
           <!-- Action Buttons -->
           <div class="grid grid-cols-2 gap-3">
             <button id="checkInBtn" ${state.locationStatus !== 'in_range' || state.todayAttendance.checkIn ? 'disabled' : ''} 
-              class="p-4 rounded-2xl flex flex-col items-center gap-2 transition ${state.locationStatus === 'in_range' && !state.todayAttendance.checkIn ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg' : 'bg-white/10 text-white/50'}">
+              class="touch-btn p-5 rounded-2xl flex flex-col items-center gap-2 transition-all ${state.locationStatus === 'in_range' && !state.todayAttendance.checkIn ? 'bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-lg shadow-green-500/20' : 'bg-white/10 text-white/50'}">
               <i data-lucide="log-in" class="w-8 h-8"></i>
-              <span class="font-medium">ເຂົ້າວຽກ</span>
-              ${state.todayAttendance.checkIn ? `<span class="text-xs">✓ ${state.todayAttendance.checkIn}</span>` : ''}
+              <span class="font-medium text-sm">ເຂົ້າວຽກ</span>
+              ${state.todayAttendance.checkIn ? `<span class="text-xs opacity-80">✓ ${state.todayAttendance.checkIn}</span>` : ''}
             </button>
             <button id="checkOutBtn" ${state.locationStatus !== 'in_range' || !state.todayAttendance.checkIn || state.todayAttendance.checkOut ? 'disabled' : ''}
-              class="p-4 rounded-2xl flex flex-col items-center gap-2 transition ${state.locationStatus === 'in_range' && state.todayAttendance.checkIn && !state.todayAttendance.checkOut ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg' : 'bg-white/10 text-white/50'}">
+              class="touch-btn p-5 rounded-2xl flex flex-col items-center gap-2 transition-all ${state.locationStatus === 'in_range' && state.todayAttendance.checkIn && !state.todayAttendance.checkOut ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white/50'}">
               <i data-lucide="log-out" class="w-8 h-8"></i>
-              <span class="font-medium">ອອກວຽກ</span>
-              ${state.todayAttendance.checkOut ? `<span class="text-xs">✓ ${state.todayAttendance.checkOut}</span>` : ''}
+              <span class="font-medium text-sm">ອອກວຽກ</span>
+              ${state.todayAttendance.checkOut ? `<span class="text-xs opacity-80">✓ ${state.todayAttendance.checkOut}</span>` : ''}
             </button>
           </div>
 
@@ -276,15 +377,15 @@
             <h3 class="text-white font-medium mb-3">ສະຖິຕິເດືອນນີ້</h3>
             <div class="grid grid-cols-3 gap-3">
               <div class="text-center p-3 bg-white/5 rounded-xl">
-                <p class="text-2xl font-bold text-green-400">18</p>
+                <p class="text-2xl font-bold text-green-400">${state.monthlyStats.present}</p>
                 <p class="text-purple-300 text-xs">ມາວຽກ</p>
               </div>
               <div class="text-center p-3 bg-white/5 rounded-xl">
-                <p class="text-2xl font-bold text-yellow-400">2</p>
+                <p class="text-2xl font-bold text-yellow-400">${state.monthlyStats.late}</p>
                 <p class="text-purple-300 text-xs">ມາສາຍ</p>
               </div>
               <div class="text-center p-3 bg-white/5 rounded-xl">
-                <p class="text-2xl font-bold text-red-400">1</p>
+                <p class="text-2xl font-bold text-red-400">${state.monthlyStats.absent}</p>
                 <p class="text-purple-300 text-xs">ຂາດ</p>
               </div>
             </div>
@@ -294,31 +395,156 @@
     }
 
     function renderHistory() {
+      // Calculate comprehensive stats
+      const totalDays = state.history.filter(r => r.checkIn).length;
+      const lateDays = state.history.filter(r => r.status === 'late').length;
+      const onTimeDays = state.history.filter(r => r.status === 'on_time').length;
+      const totalHours = state.history.reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0);
+      const normalHoursPerDay = 8;
+      const totalOT = Math.max(0, totalHours - (totalDays * normalHoursPerDay));
+
+      // Leave stats
+      const approvedLeaves = state.myLeaves.filter(l => l.status === 'approved');
+      const pendingLeaves = state.myLeaves.filter(l => l.status === 'pending');
+      const totalLeaveDays = approvedLeaves.reduce((sum, l) => sum + (l.days || 0), 0);
+
+      // Leave breakdown by type
+      const leaveByType = {};
+      approvedLeaves.forEach(l => {
+        const typeLabel = { 'annual': '🌴 ລາພັກຜ່ອນ', 'sick': '🏥 ລາເຈັບປ່ວຍ', 'personal': '📋 ລາກິດ' }[l.leaveType] || l.leaveType;
+        if (!leaveByType[typeLabel]) leaveByType[typeLabel] = { count: 0, days: 0 };
+        leaveByType[typeLabel].count++;
+        leaveByType[typeLabel].days += (l.days || 0);
+      });
+
       return `
-        <div class="space-y-3">
-          <h2 class="text-white font-bold text-lg">ປະຫວັດການເຂົ້າວຽກ</h2>
+        <div class="space-y-4">
+          <h2 class="text-white font-bold text-lg flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-5 h-5 text-purple-400"></i>
+            ສະຫຼຸບຂໍ້ມູນສ່ວນຕົວ
+          </h2>
+
+          <!-- Stat Cards Row 1: Attendance -->
+          <div class="grid grid-cols-3 gap-2">
+            <div class="glass rounded-xl p-3 border border-green-400/20 text-center">
+              <i data-lucide="calendar-check" class="w-5 h-5 text-green-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-green-400">${totalDays}</p>
+              <p class="text-green-300/60 text-xs">ມາວຽກ</p>
+            </div>
+            <div class="glass rounded-xl p-3 border border-yellow-400/20 text-center">
+              <i data-lucide="alarm-clock" class="w-5 h-5 text-yellow-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-yellow-400">${lateDays}</p>
+              <p class="text-yellow-300/60 text-xs">ມາສາຍ</p>
+            </div>
+            <div class="glass rounded-xl p-3 border border-blue-400/20 text-center">
+              <i data-lucide="clock" class="w-5 h-5 text-blue-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-blue-400">${totalHours.toFixed(1)}</p>
+              <p class="text-blue-300/60 text-xs">ຊມ ທັງໝົດ</p>
+            </div>
+          </div>
+
+          <!-- Stat Cards Row 2: OT & Leave -->
+          <div class="grid grid-cols-3 gap-2">
+            <div class="glass rounded-xl p-3 border border-cyan-400/20 text-center">
+              <i data-lucide="timer" class="w-5 h-5 text-cyan-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-cyan-400">${totalOT.toFixed(1)}</p>
+              <p class="text-cyan-300/60 text-xs">OT (ຊມ)</p>
+            </div>
+            <div class="glass rounded-xl p-3 border border-orange-400/20 text-center">
+              <i data-lucide="palm-tree" class="w-5 h-5 text-orange-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-orange-400">${totalLeaveDays}</p>
+              <p class="text-orange-300/60 text-xs">ວັນລາ (ອະນຸມັດ)</p>
+            </div>
+            <div class="glass rounded-xl p-3 border border-purple-400/20 text-center">
+              <i data-lucide="hourglass" class="w-5 h-5 text-purple-400 mx-auto mb-1"></i>
+              <p class="text-xl font-bold text-purple-400">${pendingLeaves.length}</p>
+              <p class="text-purple-300/60 text-xs">ລໍຖ້າອະນຸມັດ</p>
+            </div>
+          </div>
+
+          <!-- Leave Breakdown by Type -->
+          ${Object.keys(leaveByType).length > 0 ? `
+            <div class="glass rounded-xl p-4 border border-white/20">
+              <h3 class="text-white font-medium text-sm mb-3 flex items-center gap-2">
+                <i data-lucide="list" class="w-4 h-4 text-purple-400"></i>
+                ສະຫຼຸບການລາຕາມປະເພດ
+              </h3>
+              <div class="space-y-2">
+                ${Object.entries(leaveByType).map(([type, data]) => `
+                  <div class="flex items-center justify-between py-2 border-b border-white/5 last:border-b-0">
+                    <span class="text-white/80 text-sm">${type}</span>
+                    <div class="flex items-center gap-3">
+                      <span class="text-purple-300/60 text-xs">${data.count} ຄັ້ງ</span>
+                      <span class="text-white font-medium text-sm">${data.days} ວັນ</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Leave History Cards -->
+          ${state.myLeaves.length > 0 ? `
+            <div class="glass rounded-xl p-4 border border-white/20">
+              <h3 class="text-white font-medium text-sm mb-3 flex items-center gap-2">
+                <i data-lucide="file-text" class="w-4 h-4 text-purple-400"></i>
+                ລາຍການລາພັກ
+              </h3>
+              <div class="space-y-2">
+                ${state.myLeaves.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(leave => {
+        const typeLabel = { 'annual': '🌴 ພັກຜ່ອນ', 'sick': '🏥 ເຈັບປ່ວຍ', 'personal': '📋 ລາກິດ' }[leave.leaveType] || leave.leaveType;
+        const stMap = {
+          'pending': { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'ລໍຖ້າ' },
+          'approved': { bg: 'bg-green-500/20', text: 'text-green-400', label: 'ອະນຸມັດ' },
+          'rejected': { bg: 'bg-red-500/20', text: 'text-red-400', label: 'ປະຕິເສດ' }
+        };
+        const st = stMap[leave.status] || stMap.pending;
+        const sDate = new Date(leave.startDate);
+        const eDate = new Date(leave.endDate);
+        const dateStr = sDate.getDate() + '/' + (sDate.getMonth() + 1) + ' - ' + eDate.getDate() + '/' + (eDate.getMonth() + 1) + '/' + eDate.getFullYear();
+        return `
+                    <div class="bg-white/5 rounded-lg p-3">
+                      <div class="flex items-center justify-between">
+                        <div>
+                          <p class="text-white text-sm font-medium">${typeLabel} (${leave.days} ວັນ)</p>
+                          <p class="text-white/40 text-xs">${dateStr}</p>
+                          ${leave.reason ? `<p class="text-white/50 text-xs mt-1">📝 ${leave.reason}</p>` : ''}
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs ${st.bg} ${st.text}">${st.label}</span>
+                      </div>
+                      ${leave.status === 'rejected' && leave.rejectionReason ? `<p class="text-red-400/70 text-xs mt-1">❌ ${leave.rejectionReason}</p>` : ''}
+                    </div>
+                  `;
+      }).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Attendance Log -->
+          <h3 class="text-white font-medium text-sm flex items-center gap-2 pt-2">
+            <i data-lucide="clock" class="w-4 h-4 text-purple-400"></i>
+            ປະຫວັດການເຂົ້າ-ອອກວຽກ
+          </h3>
           
           ${state.history.length === 0 ? `
             <div class="glass rounded-xl p-8 border border-white/20 text-center">
-              <i data-lucide="inbox" class="w-12 h-12 text-purple-300 mx-auto mb-3"></i>
-              <p class="text-purple-300">ຍັງບໍ່ມີປະຫວັດການເຂົ້າວຽກ</p>
+              <i data-lucide="inbox" class="w-12 h-12 text-purple-300/30 mx-auto mb-3"></i>
+              <p class="text-purple-300/60">ຍັງບໍ່ມີປະຫວັດ</p>
             </div>
           ` : state.history.map(r => `
-            <div class="glass rounded-xl p-4 border border-white/20">
-              <div class="flex justify-between items-start">
+            <div class="glass rounded-xl p-3 border border-white/10">
+              <div class="flex justify-between items-center">
                 <div>
-                  <p class="text-white font-medium">${r.date}</p>
-                  <div class="flex gap-4 mt-1">
-                    <span class="text-purple-300 text-sm">ເຂົ້າ: ${r.checkIn}</span>
-                    <span class="text-purple-300 text-sm">ອອກ: ${r.checkOut}</span>
+                  <p class="text-white text-sm font-medium">${r.date}</p>
+                  <div class="flex gap-3 mt-0.5">
+                    <span class="text-purple-300/70 text-xs">⏰ ${r.checkIn || '--:--'}</span>
+                    <span class="text-purple-300/70 text-xs">→ ${r.checkOut || '--:--'}</span>
+                    <span class="text-blue-300/70 text-xs">${r.hours || 0} ຊມ</span>
                   </div>
                 </div>
-                <div class="text-right">
-                  <span class="text-xs px-2 py-1 rounded-full ${r.status === 'on_time' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}">
-                    ${r.status === 'on_time' ? 'ປົກກະຕິ' : 'ສາຍ'}
-                  </span>
-                  <p class="text-purple-300 text-xs mt-1">${r.hours} ຊມ</p>
-                </div>
+                <span class="text-xs px-2 py-1 rounded-full ${r.status === 'on_time' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}">
+                  ${r.status === 'on_time' ? '✓' : 'ສາຍ'}
+                </span>
               </div>
             </div>
           `).join('')}
@@ -327,21 +553,62 @@
     }
 
     function renderProfile() {
+      const u = state.user || {};
       return `
         <div class="space-y-4">
+          <!-- Avatar & Name -->
           <div class="glass rounded-2xl p-6 border border-white/20 text-center">
-            <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto flex items-center justify-center mb-4">
-              <i data-lucide="user" class="w-10 h-10 text-white"></i>
+            <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full mx-auto flex items-center justify-center mb-4 shadow-lg">
+              <span class="text-3xl text-white font-bold">${(u.fullName || u.name || '?').charAt(0)}</span>
             </div>
-            <h2 class="text-white font-bold text-lg">${state.user?.name}</h2>
-            <p class="text-purple-300">${state.user?.position}</p>
-            <p class="text-purple-400 text-sm">${state.user?.dept}</p>
-            <p class="text-purple-500 text-xs mt-2">ID: ${state.user?.id}</p>
+            <h2 class="text-white font-bold text-lg">${u.fullName || u.name || '-'}</h2>
+            <p class="text-purple-300 text-sm">${u.position || '-'}</p>
+            <p class="text-purple-400 text-xs">${u.department || u.dept || '-'}</p>
+            <p class="text-purple-500/50 text-xs mt-2">ລະຫັດ: ${u.empCode || u.id}</p>
           </div>
+
+          <!-- Detail Info Card -->
+          <div class="glass rounded-2xl p-4 border border-white/20 space-y-3">
+            <h3 class="text-white font-bold text-sm flex items-center gap-2 mb-1">
+              <i data-lucide="contact" class="w-4 h-4 text-purple-400"></i>
+              ຂໍ້ມູນສ່ວນຕົວ
+            </h3>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <span class="text-purple-300/60 text-sm">ຊື່ ແລະ ນາມສະກຸນ</span>
+              <span class="text-white text-sm">${u.fullName || u.name || '-'}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <span class="text-purple-300/60 text-sm">ອີເມວ</span>
+              <span class="text-white text-sm">${u.email || 'ບໍ່ໄດ້ລະບຸ'}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <span class="text-purple-300/60 text-sm">ເບີໂທ</span>
+              <span class="text-white text-sm">${u.phone || 'ບໍ່ໄດ້ລະບຸ'}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <span class="text-purple-300/60 text-sm">ພະແນກ</span>
+              <span class="text-white text-sm">${u.department || u.dept || '-'}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-white/5">
+              <span class="text-purple-300/60 text-sm">ຕຳແໜ່ງ</span>
+              <span class="text-white text-sm">${u.position || '-'}</span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+              <span class="text-purple-300/60 text-sm">ວັນທີ່ເຂົ້າວຽກ</span>
+              <span class="text-white text-sm">${u.hireDate ? new Date(u.hireDate).toLocaleDateString('lo-LA') : '-'}</span>
+            </div>
+          </div>
+
+          <!-- Edit Profile Button -->
+          <button onclick="openEditProfileModal()" class="touch-btn w-full py-4 bg-gradient-to-r from-purple-500 to-violet-600 text-white rounded-2xl font-medium flex items-center justify-center gap-2 transition-all shadow-lg shadow-purple-500/20">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+            ແກ້ໄຂຂໍ້ມູນສ່ວນຕົວ
+          </button>
           
+          <!-- Options Menu -->
           <div class="glass rounded-2xl border border-white/20 overflow-hidden">
-            ${state.user?.role === 'admin' ? `
-              <button onclick="window.location.href='admin.html'" class="w-full flex items-center justify-between p-4 hover:bg-white/5 border-b border-white/10">
+            ${u.role === 'admin' ? `
+              <button onclick="window.location.href='admin.html'" class="touch-btn w-full flex items-center justify-between p-4 active:bg-white/10 border-b border-white/10">
                 <div class="flex items-center gap-3">
                   <i data-lucide="shield" class="w-5 h-5 text-purple-400"></i>
                   <span class="text-white">ຈັດການລະບົບ (Admin)</span>
@@ -349,37 +616,17 @@
                 <i data-lucide="chevron-right" class="w-5 h-5 text-purple-400"></i>
               </button>
             ` : ''}
-            <button onclick="openLeaveRequestModal()" class="w-full flex items-center justify-between p-4 hover:bg-white/5 border-b border-white/10">
+            <button onclick="openChangePINModal()" class="touch-btn w-full flex items-center justify-between p-4 active:bg-white/10 border-b border-white/10">
               <div class="flex items-center gap-3">
-                <i data-lucide="calendar" class="w-5 h-5 text-purple-400"></i>
-                <span class="text-white">ຂໍລາພັກ</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-5 h-5 text-purple-400"></i>
-            </button>
-            <button onclick="viewLeaveBalance()" class="w-full flex items-center justify-between p-4 hover:bg-white/5 border-b border-white/10">
-              <div class="flex items-center gap-3">
-                <i data-lucide="clock" class="w-5 h-5 text-purple-400"></i>
-                <span class="text-white">ໂຄຕ້າລາພັກ</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-5 h-5 text-purple-400"></i>
-            </button>
-            <button onclick="openSalaryModal()" class="w-full flex items-center justify-between p-4 hover:bg-white/5 border-b border-white/10">
-              <div class="flex items-center gap-3">
-                <i data-lucide="file-text" class="w-5 h-5 text-purple-400"></i>
-                <span class="text-white">ໃບຮັບເງິນເດືອນ</span>
-              </div>
-              <i data-lucide="chevron-right" class="w-5 h-5 text-purple-400"></i>
-            </button>
-            <button class="w-full flex items-center justify-between p-4 hover:bg-white/5">
-              <div class="flex items-center gap-3">
-                <i data-lucide="settings" class="w-5 h-5 text-purple-400"></i>
-                <span class="text-white">ຕັ້ງຄ່າ</span>
+                <i data-lucide="key" class="w-5 h-5 text-purple-400"></i>
+                <span class="text-white">ປ່ຽນ PIN</span>
               </div>
               <i data-lucide="chevron-right" class="w-5 h-5 text-purple-400"></i>
             </button>
           </div>
           
-          <button id="logoutBtn" class="w-full py-3 bg-red-500/20 text-red-400 rounded-xl font-medium">
+          <button id="logoutBtn" class="touch-btn w-full py-4 bg-red-500/20 text-red-400 rounded-2xl font-medium flex items-center justify-center gap-2 transition-all">
+            <i data-lucide="log-out" class="w-5 h-5"></i>
             ອອກຈາກລະບົບ
           </button>
         </div>
@@ -388,8 +635,34 @@
 
     // ====== EVENT HANDLERS ======
     function attachEvents() {
-      // Login
-      document.getElementById('loginBtn')?.addEventListener('click', handleLogin);
+      // Login form submit (Enter key support)
+      const loginForm = document.getElementById('loginForm');
+      if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          handleLogin();
+        });
+      }
+
+      // Login button click
+      document.getElementById('loginBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleLogin();
+      });
+
+      // Password visibility toggle
+      const togglePinBtn = document.getElementById('togglePinBtn');
+      const pinInput = document.getElementById('pin');
+      const eyeIcon = document.getElementById('eyeIcon');
+
+      if (togglePinBtn && pinInput && eyeIcon) {
+        togglePinBtn.addEventListener('click', () => {
+          const isPassword = pinInput.type === 'password';
+          pinInput.type = isPassword ? 'text' : 'password';
+          eyeIcon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+          lucide.createIcons();
+        });
+      }
 
       // Tabs
       document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -428,16 +701,26 @@
       state.error = '';
       render();
 
-      const result = await callAPI('login', { empId, pin });
+      const result = await callAPI('/api/auth/login', { empId, pin });
 
       if (result.success) {
         state.user = result.user;
         localStorage.setItem('hrUser', JSON.stringify(result.user));
+
+        // ✅ Check if user is admin - redirect to admin panel
+        if (result.user.role === 'admin') {
+          window.location.href = 'admin.html';
+          return;
+        }
+
+        // Regular employee - continue to employee view
         state.screen = 'main';
         state.error = '';
 
         await loadTodayAttendance();
         await loadAttendanceHistory();
+        await loadMonthlyStats();
+        await loadMyLeaves();
       } else {
         state.error = result.error || 'ເຂົ້າສູ່ລະບົບລົ້ມເຫຼວ';
       }
@@ -449,29 +732,27 @@
     async function loadTodayAttendance() {
       if (!state.user) return;
 
-      const result = await callAPI('getTodayAttendance', {
-        employeeId: state.user.id
-      });
+      const result = await callAPI(`/api/attendance/today/${state.user.id}`, {}, 'GET');
 
       if (result.success && result.attendance) {
+        const shiftType = result.attendance.shiftType || getUserShiftType(state.user);
         state.todayAttendance = {
           checkIn: result.attendance.checkIn || null,
           checkOut: result.attendance.checkOut || null,
           status: result.attendance.status || null,
-          workHours: result.attendance.workHours || 0
+          workHours: result.attendance.workHours || 0,
+          shiftType
         };
       } else {
-        state.todayAttendance = { checkIn: null, checkOut: null };
+        const shiftType = getUserShiftType(state.user);
+        state.todayAttendance = { checkIn: null, checkOut: null, status: null, workHours: 0, shiftType };
       }
     }
 
     async function loadAttendanceHistory() {
       if (!state.user) return;
 
-      const result = await callAPI('getAttendanceHistory', {
-        employeeId: state.user.id,
-        limit: 30
-      });
+      const result = await callAPI(`/api/attendance/history/${state.user.id}?limit=30`, {}, 'GET');
 
       if (result.success && result.history) {
         state.history = result.history.map(r => ({
@@ -540,24 +821,33 @@
       state.loading = true;
       render();
 
-      const result = await callAPI('checkIn', {
-        employeeId: state.user.id,
-        lat: state.location.lat,
-        lng: state.location.lng
-      });
+      // Get current position again for check-in to ensure accuracy
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const result = await callAPI('/api/attendance/checkin', {
+          employeeId: state.user.id,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          shiftType: state.todayAttendance.shiftType || getUserShiftType(state.user)
+        });
 
-      if (result.success) {
-        state.todayAttendance.checkIn = result.time;
-        state.todayAttendance.status = result.status;
-        state.error = '';
-        showSuccess(`✅ ${result.message} (${result.status === 'on_time' ? 'ປົກກະຕິ' : 'ສາຍ'})`);
-        await loadAttendanceHistory();
-      } else {
-        state.error = '❌ ' + result.error;
-      }
+        if (result.success) {
+          state.todayAttendance.shiftType = state.todayAttendance.shiftType || getUserShiftType(state.user);
+          state.todayAttendance.checkIn = result.time;
+          state.todayAttendance.status = result.status;
+          state.error = '';
+          showSuccess(`✅ ${result.message} (${result.status === 'on_time' ? 'ປົກກະຕິ' : 'ສາຍ'})`);
+          await loadAttendanceHistory();
+        } else {
+          state.error = '❌ ' + result.error;
+        }
 
-      state.loading = false;
-      render();
+        state.loading = false;
+        render();
+      }, (err) => {
+        state.error = '❌ ບໍ່ສາມາດດຶງຕຳແໜ່ງໄດ້ສຳລັບການເຂົ້າວຽກ';
+        state.loading = false;
+        render();
+      }, { enableHighAccuracy: true, timeout: 10000 });
     }
 
     async function handleCheckOut() {
@@ -576,23 +866,86 @@
       state.loading = true;
       render();
 
-      const result = await callAPI('checkOut', {
-        employeeId: state.user.id,
-        lat: state.location.lat,
-        lng: state.location.lng
-      });
+      // Get current position again for check-out to ensure accuracy
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const result = await callAPI('/api/attendance/checkout', {
+          employeeId: state.user.id,
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        });
 
-      if (result.success) {
-        state.todayAttendance.checkOut = result.checkOut;
-        state.error = '';
-        showSuccess(`✅ ${result.message} | ເຮັດວຽກ: ${result.workHours} ຊົ່ວໂມງ`);
-        await loadAttendanceHistory();
-      } else {
-        state.error = '❌ ' + result.error;
+        if (result.success) {
+          state.todayAttendance.checkOut = result.time;
+          state.todayAttendance.workHours = result.workHours;
+          state.error = '';
+          showSuccess(`✅ ${result.message} (ເຮັດວຽກ ${result.workHours} ຊົ່ວໂມງ)`);
+          await loadAttendanceHistory();
+        } else {
+          state.error = '❌ ' + result.error;
+        }
+
+        state.loading = false;
+        render();
+      }, (err) => {
+        state.error = '❌ ບໍ່ສາມາດດຶງຕຳແໜ່ງໄດ້ສຳລັບການອອກວຽກ';
+        state.loading = false;
+        render();
+      }, { enableHighAccuracy: true, timeout: 10000 });
+    }
+
+    // ====== EMPLOYEE PROFILE FUNCTIONS ======
+    // Functions are defined in js/employee-leave.js
+
+    // ====== MONTHLY STATS ======
+    async function loadMonthlyStats() {
+      if (!state.user) return;
+      try {
+        const result = await callAPI(`/api/attendance/history/${state.user.id}?limit=60`, {}, 'GET');
+        if (result.success && result.history) {
+          const now = new Date();
+          const thisMonth = now.getMonth();
+          const thisYear = now.getFullYear();
+          const monthRecords = result.history.filter(r => {
+            const d = new Date(r.date);
+            return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+          });
+          let present = 0, late = 0;
+          monthRecords.forEach(r => {
+            if (r.checkIn) present++;
+            if (r.status === 'late') late++;
+          });
+          // Calculate working days so far this month
+          const startOfMonth = new Date(thisYear, thisMonth, 1);
+          let workingDays = 0;
+          for (let d = new Date(startOfMonth); d <= now; d.setDate(d.getDate() + 1)) {
+            const day = d.getDay();
+            if (day !== 0 && day !== 6) workingDays++;
+          }
+          state.monthlyStats = {
+            present,
+            late,
+            absent: Math.max(0, workingDays - present)
+          };
+        }
+      } catch (e) {
+        console.error('Error loading monthly stats:', e);
       }
+    }
 
-      state.loading = false;
-      render();
+    // ====== LOAD MY LEAVES ======
+    async function loadMyLeaves() {
+      if (!state.user) return;
+      try {
+        const result = await callAPI(`/api/leave/my-requests/${state.user.id}`, {}, 'GET');
+        if (result.success && result.requests) {
+          state.myLeaves = result.requests;
+        } else {
+          state.myLeaves = [];
+        }
+      } catch (e) {
+        console.error('Error loading my leaves:', e);
+        state.myLeaves = [];
+      }
     }
 
     // ====== CLOCK UPDATE ======
@@ -604,6 +957,32 @@
     // ====== INIT ======
     render();
   </script>
+
+  <!-- ========== MODALS ========== -->
+
+  <!-- Leave Request Modal -->
+  <div id="leaveRequestModal"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-[#1a1a2e] rounded-3xl p-6 w-full max-w-lg border border-white/10 shadow-2xl mx-4">
+      <!-- Modal content will be rendered by JavaScript -->
+    </div>
+  </div>
+
+  <!-- Leave Balance Modal -->
+  <div id="leaveBalanceModal"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-[#1a1a2e] rounded-3xl p-6 w-full max-w-lg border border-white/10 shadow-2xl mx-4">
+      <!-- Modal content will be rendered by JavaScript -->
+    </div>
+  </div>
+
+  <!-- Salary Slip Modal -->
+  <div id="salaryModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+    <div class="bg-[#1a1a2e] rounded-3xl p-6 w-full max-w-2xl border border-white/10 shadow-2xl mx-4">
+      <!-- Modal content will be rendered by JavaScript -->
+    </div>
+  </div>
+
 </body>
 
 </html>
