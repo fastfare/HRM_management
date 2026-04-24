@@ -159,11 +159,18 @@ function openRegisterModal() {
                         <option>Sales</option>
                         <option>Marketing</option>
                         <option>Operations</option>
+                        <option>Technician</option>
                     </select>
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ຕຳແໜ່ງ <span class="text-red-400">*</span></label>
-                    <input id="regPosition" type="text" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500" />
+                    <select id="regPosition" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500">
+                        <option value="">-- ເລືອກຕຳແໜ່ງ --</option>
+                        <option>ຜູ້ຈັດການ</option>
+                        <option>ພະນັກງານ</option>
+                        <option>ຊ່າງ</option>
+                        <option>ບັນຊີ</option>
+                    </select>
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ອີເມລ</label>
@@ -278,11 +285,18 @@ function openEditModal(empId) {
                         <option ${emp.department === 'Sales' ? 'selected' : ''}>Sales</option>
                         <option ${emp.department === 'Marketing' ? 'selected' : ''}>Marketing</option>
                         <option ${emp.department === 'Operations' ? 'selected' : ''}>Operations</option>
+                        <option ${emp.department === 'Technician' ? 'selected' : ''}>Technician</option>
                     </select>
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ຕຳແໜ່ງ</label>
-                    <input id="editPosition" value="${emp.position}" type="text" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    <select id="editPosition" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
+                        <option ${emp.position === 'ຜູ້ຈັດການ' ? 'selected' : ''}>ຜູ້ຈັດການ</option>
+                        <option ${emp.position === 'ພະນັກງານ' ? 'selected' : ''}>ພະນັກງານ</option>
+                        <option ${emp.position === 'ຊ່າງ' ? 'selected' : ''}>ຊ່າງ</option>
+                        <option ${emp.position === 'ບັນຊີ' ? 'selected' : ''}>ບັນຊີ</option>
+                        ${!['ຜູ້ຈັດການ', 'ພະນັກງານ', 'ຊ່າງ', 'ບັນຊີ'].includes(emp.position) ? `<option selected>${emp.position}</option>` : ''}
+                    </select>
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ອີເມລ</label>

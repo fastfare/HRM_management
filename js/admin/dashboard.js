@@ -270,12 +270,20 @@ function renderAttendanceTable() {
 function renderAttendanceRow(emp) {
     const workingHours = emp.checkIn && emp.checkOut ? calculateWorkingHours(emp.checkIn, emp.checkOut) : '-';
 
+    let statusLabel = emp.status === 'working' ? 'ປົກກະຕິ' : emp.status === 'late' ? 'ມາສາຍ' : emp.status === 'absent' ? 'ຂາດວຽກ' : 'ພັກ';
+    let statusClass = emp.status === 'working' ? 'bg-green-500/20 text-green-400' : emp.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400';
+    let avatarBg = emp.status === 'working' ? 'bg-green-500' : emp.status === 'late' ? 'bg-yellow-500' : 'bg-red-500';
+
+    if (emp.forgotCheckOut) {
+        statusLabel = 'ລືມກົດອອກ';
+        statusClass = 'bg-orange-500/20 text-orange-400';
+        avatarBg = 'bg-orange-500';
+    }
+
     return `
         <div class="grid grid-cols-8 gap-4 p-4 border-t border-white/10 items-center hover:bg-white/5 transition-colors">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${emp.status === 'working' ? 'bg-green-500' :
-            emp.status === 'late' ? 'bg-yellow-500' : 'bg-red-500'
-        }">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${avatarBg}">
                     ${emp.avatar}
                 </div>
                 <span class="text-white">${emp.fullName}</span>
@@ -283,13 +291,10 @@ function renderAttendanceRow(emp) {
             <span class="text-white/70">${emp.department}</span>
             <span class="text-white/70">${emp.shiftLabel || 'standard'}</span>
             <span class="text-white">${emp.checkIn || '-'}</span>
-            <span class="text-white">${emp.checkOut || '-'}</span>
+            <span class="text-white ${emp.forgotCheckOut ? 'text-orange-400 italic' : ''}">${emp.checkOut || (emp.forgotCheckOut ? 'ລືມກົດອອກ' : '-')}</span>
             <span class="text-white">${workingHours}</span>
-            <span class="px-3 py-1 rounded-full text-xs w-fit ${emp.status === 'working' ? 'bg-green-500/20 text-green-400' :
-            emp.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' :
-                'bg-red-500/20 text-red-400'
-        }">
-                ${emp.status === 'working' ? 'ປົກກະຕິ' : emp.status === 'late' ? 'ມາສາຍ' : emp.status === 'absent' ? 'ຂາດວຽກ' : 'ພັກ'}
+            <span class="px-3 py-1 rounded-full text-xs w-fit ${statusClass}">
+                ${statusLabel}
             </span>
             <div class="flex justify-center gap-2">
                 <button class="p-2 hover:bg-white/10 rounded-lg text-blue-400 transition-colors">

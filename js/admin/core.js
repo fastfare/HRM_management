@@ -199,17 +199,25 @@ function getEmployeeShift(emp) {
 }
 
 function getAttendanceByDate(date) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+    const targetDate = date || today;
     return state.employees.filter(e => e.status === 'active').map(emp => {
         const record = state.attendance.find(a => a.employeeId === emp.id && a.date === targetDate);
         const shiftType = record?.shiftType || getEmployeeShift(emp);
         const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
 
         let status;
+        let forgotCheckOut = false;
+
         if (!record?.checkIn) {
             status = shiftType === 'off' ? 'off' : 'absent';
         } else {
             status = isLate(record.checkIn, shiftType) ? 'late' : 'working';
+            
+            // Check if forgot to check out (has check-in, no check-out, and date is in the past)
+            if (!record.checkOut && targetDate < today) {
+                forgotCheckOut = true;
+            }
         }
 
         return {
@@ -219,6 +227,7 @@ function getAttendanceByDate(date) {
             checkIn: record?.checkIn || null,
             checkOut: record?.checkOut || null,
             status,
+            forgotCheckOut,
             avatar: emp.fullName.charAt(0),
             date: targetDate
         };
