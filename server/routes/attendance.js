@@ -65,7 +65,7 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
             console.warn(`Check-in rejected: Out of range for user ${currentEmpCode}`);
             return res.json({
                 success: false,
-                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m) [User: ${currentEmpCode}]`
+                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)`
             });
         }
         const now = new Date();
@@ -137,7 +137,7 @@ router.post('/checkout', (req, res) => {
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
             return res.json({ 
                 success: false, 
-                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m) [User: ${employee.empCode}]` 
+                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)` 
             });
         }
 

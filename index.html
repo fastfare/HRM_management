@@ -847,19 +847,16 @@
 
             console.log('API Result:', result);
             if (result.success) {
-              alert('DEBUG: ເຂົ້າວຽກສຳເລັດແລ້ວ! ກະລຸນາກວດເບິ່ງ Dashboard');
               state.successMessage = '✅ ເຂົ້າວຽກສຳເລັດ!';
               await loadTodayAttendance();
               await loadAttendanceHistory();
               await loadMonthlyStats();
               setTimeout(() => { state.successMessage = ''; render(); }, 3000);
             } else {
-              alert('DEBUG ERROR: ' + (result.error || 'Unknown Error'));
               state.error = '❌ ' + (result.error || 'ເກີດຂໍ້ຜິດພາດ');
             }
           } catch (apiErr) {
             console.error('Check-in API Error:', apiErr);
-            alert('DEBUG FATAL API: ' + apiErr.message);
             state.error = '❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ Server';
           } finally {
             state.loading = false;
@@ -938,18 +935,15 @@
             });
 
             if (result.success) {
-              alert('DEBUG: ອອກວຽກສຳເລັດແລ້ວ!');
               state.successMessage = '✅ ອອກວຽກສຳເລັດ!';
               await loadTodayAttendance();
               await loadAttendanceHistory();
               await loadMonthlyStats();
               setTimeout(() => { state.successMessage = ''; render(); }, 3000);
             } else {
-              alert('DEBUG OUT ERROR: ' + (result.error || 'Unknown Error'));
               state.error = '❌ ' + (result.error || 'ເກີດຂໍ້ຜິດພາດ');
             }
           } catch (apiErr) {
-            alert('DEBUG OUT FATAL: ' + apiErr.message);
             state.error = '❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ Server';
           } finally {
             state.loading = false;
