@@ -160,6 +160,7 @@ function openRegisterModal() {
                         <option>Marketing</option>
                         <option>Operations</option>
                         <option>Technician</option>
+                        <option>Technical</option>
                     </select>
                 </div>
                 <div>
@@ -169,6 +170,7 @@ function openRegisterModal() {
                         <option>ຜູ້ຈັດການ</option>
                         <option>ພະນັກງານ</option>
                         <option>ຊ່າງ</option>
+                        <option>TECH</option>
                         <option>ບັນຊີ</option>
                     </select>
                 </div>
@@ -295,6 +297,7 @@ function openEditModal(empId) {
                         <option ${emp.department === 'Marketing' ? 'selected' : ''}>Marketing</option>
                         <option ${emp.department === 'Operations' ? 'selected' : ''}>Operations</option>
                         <option ${emp.department === 'Technician' ? 'selected' : ''}>Technician</option>
+                        <option ${emp.department === 'Technical' ? 'selected' : ''}>Technical</option>
                     </select>
                 </div>
                 <div>
@@ -303,8 +306,9 @@ function openEditModal(empId) {
                         <option ${emp.position === 'ຜູ້ຈັດການ' ? 'selected' : ''}>ຜູ້ຈັດການ</option>
                         <option ${emp.position === 'ພະນັກງານ' ? 'selected' : ''}>ພະນັກງານ</option>
                         <option ${emp.position === 'ຊ່າງ' ? 'selected' : ''}>ຊ່າງ</option>
+                        <option ${emp.position === 'TECH' ? 'selected' : ''}>TECH</option>
                         <option ${emp.position === 'ບັນຊີ' ? 'selected' : ''}>ບັນຊີ</option>
-                        ${!['ຜູ້ຈັດການ', 'ພະນັກງານ', 'ຊ່າງ', 'ບັນຊີ'].includes(emp.position) ? `<option selected>${emp.position}</option>` : ''}
+                        ${!['ຜູ້ຈັດການ', 'ພະນັກງານ', 'ຊ່າງ', 'TECH', 'ບັນຊີ'].includes(emp.position) ? `<option selected>${emp.position}</option>` : ''}
                     </select>
                 </div>
                 <div>
