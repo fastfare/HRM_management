@@ -802,6 +802,74 @@ function renderReportPreview(exportType) {
                 </div>
             `;
         }
+        case 'ot': {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+            const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
+
+            const activeEmps = state.employees.filter(e => e.status !== 'inactive');
+            const attendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate && a.checkOut);
+
+            return `
+                <div class="flex flex-wrap items-end gap-3 mb-6">
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ເລີ່ມວັນທີ່</label>
+                        <input id="reportStartDate" type="date" value="${startDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
+                    </div>
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ຫາວັນທີ່</label>
+                        <input id="reportEndDate" type="date" value="${endDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
+                    </div>
+                </div>
+
+                <div class="bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead class="bg-white/5 text-white/70">
+                            <tr>
+                                <th class="p-3 text-left">ລະຫັດ</th>
+                                <th class="p-3 text-left">ຊື່ ແລະ ນາມສະກຸນ</th>
+                                <th class="p-3 text-center">ມື້ເຮັດວຽກ</th>
+                                <th class="p-3 text-center">ໂມງປົກກະຕິ</th>
+                                <th class="p-3 text-center bg-violet-500/20 text-violet-400">ໂມງ OT ລວມ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${activeEmps.map(emp => {
+                                const empAtt = attendance.filter(a => a.employeeId === emp.id);
+                                let totalNormal = 0;
+                                let totalOT = 0;
+
+                                empAtt.forEach(record => {
+                                    const workHours = parseFloat(record.workHours || 0);
+                                    const dateObj = new Date(record.date);
+                                    const dayOfWeek = dateObj.getDay();
+                                    const empWorkDays = emp.workDays || [1, 2, 3, 4, 5, 6];
+                                    const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+
+                                    if (isWorkDay) {
+                                        totalNormal += Math.min(8, workHours);
+                                        totalOT += Math.max(0, workHours - 8);
+                                    } else {
+                                        totalOT += workHours;
+                                    }
+                                });
+
+                                return `
+                                    <tr class="hover:bg-white/5">
+                                        <td class="p-3 text-white/50">${emp.empCode}</td>
+                                        <td class="p-3 text-white">${emp.fullName}</td>
+                                        <td class="p-3 text-center text-white/70">${empAtt.length} ມື້</td>
+                                        <td class="p-3 text-center text-white/70">${totalNormal.toFixed(2)}</td>
+                                        <td class="p-3 text-center text-violet-400 font-bold">${totalOT.toFixed(2)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
         case 'attendance-matrix': {
             const now = new Date();
             const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
