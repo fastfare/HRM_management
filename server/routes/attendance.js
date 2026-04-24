@@ -98,7 +98,13 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
         };
 
         attendance.push(newRecord);
-        writeJSON('attendance.json', attendance);
+        const saveSuccess = writeJSON('attendance.json', attendance);
+        
+        if (!saveSuccess) {
+            console.error('DATABASE ERROR: Could not write attendance.json');
+            return res.json({ success: false, error: 'ບໍ່ສາມາດບັນທຶກລົງຖານຂໍ້ມູນໄດ້ (Database Write Error)' });
+        }
+
         console.log('Check-in successful saved.');
 
         res.json({ success: true, message: 'ເຂົ້າວຽກສຳເລັດ', checkIn: timeNow, status });
@@ -153,7 +159,12 @@ router.post('/checkout', (req, res) => {
             workHours: parseFloat(workHours)
         };
 
-        writeJSON('attendance.json', attendance);
+        const saveSuccess = writeJSON('attendance.json', attendance);
+        if (!saveSuccess) {
+            console.error('DATABASE ERROR: Could not write attendance.json (checkout)');
+            return res.json({ success: false, error: 'ບໍ່ສາມາດບັນທຶກຂໍ້ມູນອອກວຽກໄດ້' });
+        }
+
         console.log('Check-out successful saved.');
         res.json({ success: true, message: 'ອອກວຽກສຳເລັດ', checkOut: timeNow, workHours });
 
