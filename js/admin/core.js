@@ -808,8 +808,20 @@ function renderReportPreview(exportType) {
             const startDate = document.getElementById('reportStartDate')?.value || firstDay;
             const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
 
+            // Calculate all dates in range
+            const getDatesInRange = (start, end) => {
+                const dates = [];
+                let curr = new Date(start);
+                const last = new Date(end);
+                while (curr <= last) {
+                    dates.push(new Date(curr).toISOString().split('T')[0]);
+                    curr.setDate(curr.getDate() + 1);
+                }
+                return dates;
+            };
+
+            const dateRange = getDatesInRange(startDate, endDate);
             const activeEmps = state.employees.filter(e => e.status !== 'inactive');
-            const attendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate && a.checkOut);
 
             return `
                 <div class="flex flex-wrap items-end gap-3 mb-6">
@@ -823,50 +835,57 @@ function renderReportPreview(exportType) {
                     </div>
                 </div>
 
+                <div class="text-center mb-6">
+                    <h3 class="text-white text-xl font-bold">ລາຍງານໂມງ OT ລາຍວັນ</h3>
+                    <p class="text-white/60">ຊ່ວງເວລາ: ${startDate.split('-').reverse().join('/')} - ${endDate.split('-').reverse().join('/')}</p>
+                </div>
+
                 <div class="bg-[#1a1a2e] rounded-xl border border-white/10 overflow-hidden">
-                    <table class="w-full text-sm">
-                        <thead class="bg-white/5 text-white/70">
-                            <tr>
-                                <th class="p-3 text-left">ລະຫັດ</th>
-                                <th class="p-3 text-left">ຊື່ ແລະ ນາມສະກຸນ</th>
-                                <th class="p-3 text-center">ມື້ເຮັດວຽກ</th>
-                                <th class="p-3 text-center">ໂມງປົກກະຕິ</th>
-                                <th class="p-3 text-center bg-violet-500/20 text-violet-400">ໂມງ OT ລວມ</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5">
-                            ${activeEmps.map(emp => {
-                                const empAtt = attendance.filter(a => a.employeeId === emp.id);
-                                let totalNormal = 0;
-                                let totalOT = 0;
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-[10px] text-center border-collapse">
+                            <thead>
+                                <tr class="bg-white/5 text-white/70">
+                                    <th class="p-2 border border-white/10 text-left">ລຳດັບ</th>
+                                    <th class="p-2 border border-white/10 text-left min-w-[120px]">ຊື່ ແລະ ນາມສະກຸນ</th>
+                                    ${dateRange.map(d => `<th class="p-1 border border-white/10 min-w-[25px]">${d.split('-')[2]}</th>`).join('')}
+                                    <th class="p-2 border border-white/10 bg-violet-500/20 text-violet-400">ລວມ OT</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                ${activeEmps.map((emp, idx) => {
+                                    const empAtt = state.attendance.filter(a => a.employeeId === emp.id && a.date >= startDate && a.date <= endDate);
+                                    let rowTotalOT = 0;
 
-                                empAtt.forEach(record => {
-                                    const workHours = parseFloat(record.workHours || 0);
-                                    const dateObj = new Date(record.date);
-                                    const dayOfWeek = dateObj.getDay();
-                                    const empWorkDays = emp.workDays || [1, 2, 3, 4, 5, 6];
-                                    const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+                                    return `
+                                        <tr>
+                                            <td class="p-2 border border-white/10 text-white/50">${idx + 1}</td>
+                                            <td class="p-2 border border-white/10 text-white text-left font-medium text-xs">${emp.fullName}</td>
+                                            ${dateRange.map(d => {
+                                                const record = empAtt.find(a => a.date === d);
+                                                let otDisplay = '';
+                                                
+                                                if (record && record.checkOut) {
+                                                    const workHours = parseFloat(record.workHours || 0);
+                                                    const dateObj = new Date(record.date);
+                                                    const dayOfWeek = dateObj.getDay();
+                                                    const empWorkDays = emp.workDays || [1, 2, 3, 4, 5, 6];
+                                                    const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
 
-                                    if (isWorkDay) {
-                                        totalNormal += Math.min(8, workHours);
-                                        totalOT += Math.max(0, workHours - 8);
-                                    } else {
-                                        totalOT += workHours;
-                                    }
-                                });
-
-                                return `
-                                    <tr class="hover:bg-white/5">
-                                        <td class="p-3 text-white/50">${emp.empCode}</td>
-                                        <td class="p-3 text-white">${emp.fullName}</td>
-                                        <td class="p-3 text-center text-white/70">${empAtt.length} ມື້</td>
-                                        <td class="p-3 text-center text-white/70">${totalNormal.toFixed(2)}</td>
-                                        <td class="p-3 text-center text-violet-400 font-bold">${totalOT.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
+                                                    let dailyOT = isWorkDay ? Math.max(0, workHours - 8) : workHours;
+                                                    if (dailyOT > 0) {
+                                                        otDisplay = dailyOT.toFixed(1);
+                                                        rowTotalOT += dailyOT;
+                                                    }
+                                                }
+                                                return `<td class="p-1 border border-white/10 text-violet-300">${otDisplay}</td>`;
+                                            }).join('')}
+                                            <td class="p-2 border border-white/10 bg-violet-500/10 text-violet-400 font-bold">${rowTotalOT.toFixed(1)}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
         }

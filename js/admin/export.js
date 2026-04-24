@@ -329,53 +329,59 @@ function prepareAttendanceMatrixData() {
 }
 
 function prepareOTData() {
-    const startDate = document.getElementById('reportStartDate')?.value;
-    const endDate = document.getElementById('reportEndDate')?.value;
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+    const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
     
-    let filtered;
-    if (startDate && endDate) {
-        filtered = state.attendance.filter(a => a.date >= startDate && a.date <= endDate && a.checkOut);
-    } else {
-        filtered = filterDataByPeriod(state.attendance).filter(a => a.checkOut);
-    }
-
-    return filtered.map(record => {
-        const emp = state.employees.find(e => e.id === record.employeeId);
-        const workHours = parseFloat(record.workHours || 0);
-        
-        // Get day of week (0=Sun, 1=Mon, ..., 6=Sat)
-        const dateObj = new Date(record.date);
-        const dayOfWeek = dateObj.getDay();
-        
-        // Check if it's a work day for this employee (Default to Mon-Sat if not set)
-        const empWorkDays = emp?.workDays || [1, 2, 3, 4, 5, 6];
-        const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
-        
-        let normalHours = 0;
-        let otHours = 0;
-        
-        if (isWorkDay) {
-            // On a work day, standard is 8 hours, rest is OT
-            normalHours = Math.min(8, workHours);
-            otHours = Math.max(0, workHours - 8);
-        } else {
-            // On an off day, everything is OT
-            normalHours = 0;
-            otHours = workHours;
+    // Calculate all dates in range
+    const getDatesInRange = (start, end) => {
+        const dates = [];
+        let curr = new Date(start);
+        const last = new Date(end);
+        while (curr <= last) {
+            dates.push(new Date(curr).toISOString().split('T')[0]);
+            curr.setDate(curr.getDate() + 1);
         }
-        
-        return {
-            'ວັນທີ່': record.date,
-            'ວັນໃນອາທິດ': ['ອາທິດ', 'ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ'][dayOfWeek],
-            'ລະຫັດພະນັກງານ': emp?.empCode || '-',
-            'ຊື່-ນາມສະກຸນ': emp?.fullName || '-',
-            'ພະແນກ': emp?.department || '-',
-            'ປະເພດມື້': isWorkDay ? 'ມື້ວຽກປົກກະຕິ' : 'ມື້ພັກ (OT)',
-            'ເຂົ້າວຽກ': record.checkIn || '-',
-            'ອອກວຽກ': record.checkOut || '-',
-            'ຊົ່ວໂມງເຮັດວຽກລວມ': workHours,
-            'ຊົ່ວໂມງປົກກະຕິ': normalHours,
-            'ໂມງ OT': parseFloat(otHours.toFixed(2))
+        return dates;
+    };
+
+    const dateRange = getDatesInRange(startDate, endDate);
+    const activeEmps = state.employees.filter(e => e.status !== 'inactive');
+
+    return activeEmps.map((emp, idx) => {
+        const empAtt = state.attendance.filter(a => a.employeeId === emp.id && a.date >= startDate && a.date <= endDate);
+        let totalOT = 0;
+
+        const row = {
+            'ລຳດັບ': idx + 1,
+            'ລະຫັດ': emp.empCode,
+            'ຊື່ ແລະ ນາມສະກຸນ': emp.fullName
         };
+
+        // Fill dates in range
+        dateRange.forEach(d => {
+            const record = empAtt.find(a => a.date === d);
+            let dailyOT = 0;
+            
+            if (record && record.checkOut) {
+                const workHours = parseFloat(record.workHours || 0);
+                const dateObj = new Date(record.date);
+                const dayOfWeek = dateObj.getDay();
+                const empWorkDays = emp.workDays || [1, 2, 3, 4, 5, 6];
+                const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+
+                dailyOT = isWorkDay ? Math.max(0, workHours - 8) : workHours;
+                if (dailyOT > 0) {
+                    totalOT += dailyOT;
+                }
+            }
+            
+            const dayNum = d.split('-')[2];
+            row[dayNum] = dailyOT > 0 ? dailyOT.toFixed(1) : '';
+        });
+
+        row['ລວມ OT'] = totalOT.toFixed(1);
+        return row;
     });
 }
