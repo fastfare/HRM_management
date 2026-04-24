@@ -104,7 +104,7 @@ function prepareAttendanceSummaryData() {
         filteredAttendance = state.attendance; // Fallback or handle appropriately
     }
 
-    return state.employees.filter(e => e.status === 'active').map(emp => {
+    return state.employees.filter(e => e.status !== 'inactive').map(emp => {
         const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id);
         const present = empAtt.filter(a => a.checkIn).length;
         const late = empAtt.filter(a => isLate(a.checkIn, a.shiftType)).length;
@@ -122,7 +122,7 @@ function prepareAttendanceSummaryData() {
 }
 
 function prepareEmployeeData() {
-    return state.employees.filter(e => e.status === 'active').map(emp => ({
+    return state.employees.filter(e => e.status !== 'inactive').map(emp => ({
         'ລະຫັດ': emp.empCode,
         'ຊື່-ນາມສະກຸນ': emp.fullName,
         'ອີເມລ': emp.email,
@@ -158,7 +158,7 @@ function prepareLeaveData() {
 function preparePayrollData() {
     // Group by department
     const deptGroups = {};
-    state.employees.filter(e => e.status === 'active').forEach(emp => {
+    state.employees.filter(e => e.status !== 'inactive').forEach(emp => {
         if (!deptGroups[emp.department]) {
             deptGroups[emp.department] = {
                 department: emp.department,
@@ -297,7 +297,7 @@ function prepareAttendanceMatrixData() {
     };
 
     const dateRange = getDatesInRange(startDate, endDate);
-    const activeEmps = state.employees.filter(e => e.status === 'active');
+    const activeEmps = state.employees.filter(e => e.status !== 'inactive');
 
     return activeEmps.map((emp, idx) => {
         const empAtt = state.attendance.filter(a => a.employeeId === emp.id && a.date >= startDate && a.date <= endDate);

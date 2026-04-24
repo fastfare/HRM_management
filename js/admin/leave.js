@@ -18,7 +18,7 @@ function renderLeaves() {
 // ============ 1. ສະເໜີລາພັກ (Submit Leave Request) ============
 
 function renderLeaveRequestForm() {
-    const activeEmployees = state.employees.filter(e => e.status === 'active');
+    const activeEmployees = state.employees.filter(e => e.status !== 'inactive');
 
     const content = `
         <div class="max-w-2xl mx-auto space-y-6">

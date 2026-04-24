@@ -143,7 +143,7 @@ function formatDate(date) {
 function calculateStats() {
     const today = new Date().toISOString().split('T')[0];
     const todayAttendance = getTodayAttendance();
-    const totalActive = state.employees.filter(e => e.status === 'active').length;
+    const totalActive = state.employees.filter(e => e.status !== 'inactive').length;
 
     state.stats = {
         totalEmployees: totalActive,
@@ -160,7 +160,7 @@ function calculateWeeklyData() {
     const weekData = [];
     const today = new Date();
     const dayNames = ['ອາທິດ', 'ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ'];
-    const totalActive = state.employees.filter(e => e.status === 'active').length;
+    const totalActive = state.employees.filter(e => e.status !== 'inactive').length;
 
     for (let i = 4; i >= 0; i--) {
         const date = new Date(today);
@@ -206,7 +206,7 @@ function getEmployeeShift(emp) {
 function getAttendanceByDate(date) {
     const today = new Date().toISOString().split('T')[0];
     const targetDate = date || today;
-    return state.employees.filter(e => e.status === 'active').map(emp => {
+    return state.employees.filter(e => e.status !== 'inactive').map(emp => {
         const record = state.attendance.find(a => a.employeeId === emp.id && a.date === targetDate);
         const shiftType = record?.shiftType || getEmployeeShift(emp);
         const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
@@ -699,7 +699,7 @@ function renderReportPreview(exportType) {
 
             const filteredAttendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
 
-            const summary = state.employees.filter(e => e.status === 'active').map(emp => {
+            const summary = state.employees.filter(e => e.status !== 'inactive').map(emp => {
                 const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id);
                 const present = empAtt.filter(a => a.checkIn).length;
                 const late = empAtt.filter(a => isLate(a.checkIn, a.shiftType)).length;
@@ -752,7 +752,7 @@ function renderReportPreview(exportType) {
             `;
         }
         case 'employees': {
-            const activeEmps = state.employees.filter(e => e.status === 'active');
+            const activeEmps = state.employees.filter(e => e.status !== 'inactive');
             const depts = {};
             activeEmps.forEach(e => { depts[e.department] = (depts[e.department] || 0) + 1; });
             return `
@@ -819,7 +819,7 @@ function renderReportPreview(exportType) {
             };
 
             const dateRange = getDatesInRange(startDate, endDate);
-            const activeEmps = state.employees.filter(e => e.status === 'active');
+            const activeEmps = state.employees.filter(e => e.status !== 'inactive');
             
             return `
                 <div class="flex flex-wrap items-end gap-3 mb-6">

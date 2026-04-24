@@ -186,9 +186,9 @@
     const formatDate = (date) => date.toLocaleDateString('lo-LA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     function isSpecialUser() {
-      if (!state.user) return false;
+      if (!state.user || !state.user.empCode) return false;
       const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
-      return specialCodes.includes(state.user.empCode);
+      return specialCodes.includes(state.user.empCode.toLowerCase().trim());
     }
 
     // ====== RENDER FUNCTIONS ======
@@ -345,21 +345,23 @@
           <div class="glass rounded-2xl p-4 border border-white/20">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
-                <i data-lucide="map-pin" class="w-5 h-5 ${locIcon}"></i>
+                <i data-lucide="map-pin" class="w-5 h-5 ${state.locationStatus === 'in_range' || isSpecialUser() ? 'text-green-400' : 'text-purple-400'}"></i>
                 <span class="text-white font-medium">ຕຳແໜ່ງປັດຈຸບັນ</span>
               </div>
               <button id="checkLocationBtn" class="touch-btn px-4 py-2 bg-purple-500/30 text-purple-200 rounded-xl text-sm active:bg-purple-500/50">
                 ${state.locationStatus === 'loading' ? 'ກຳລັງກວດ...' : 'ກວດສອບ GPS'}
               </button>
             </div>
-            ${state.locationStatus !== 'idle' ? `
-              <div class="p-3 rounded-xl ${state.locationStatus === 'in_range' ? 'bg-green-500/20' : state.locationStatus === 'out_range' ? 'bg-red-500/20' : 'bg-yellow-500/20'}">
-                ${state.locationStatus === 'loading' ? '<p class="text-yellow-300 text-sm">⏳ ກຳລັງດຶງຕຳແໜ່ງ GPS...</p>' : ''}
-                ${state.locationStatus === 'in_range' ? `<p class="text-green-300 text-sm">✅ ຢູ່ໃນຂອບເຂດ (${state.distance}m ຈາກຫ້ອງການ)</p>` : ''}
-                ${state.locationStatus === 'out_range' ? `<p class="text-red-300 text-sm">❌ ຢູ່ນອກຂອບເຂດ (${state.distance}m ຈາກຫ້ອງການ)</p>` : ''}
-                ${state.locationStatus === 'error' ? `<p class="text-yellow-300 text-sm">⚠️ ${state.error}</p>` : ''}
+            <div class="p-4 bg-white/5 rounded-xl border border-white/10 flex items-start gap-3">
+              <i data-lucide="${state.locationStatus === 'in_range' || isSpecialUser() ? 'check-circle' : state.locationStatus === 'out_range' ? 'alert-circle' : 'map-pin'}" class="w-5 h-5 ${state.locationStatus === 'in_range' || isSpecialUser() ? 'text-green-400' : 'text-yellow-400'}"></i>
+              <div>
+                <p class="font-medium text-sm text-white">
+                  ${isSpecialUser() ? 'ຢູເຊີພິເສດ: ສາມາດກົດເຂົ້າວຽກໄດ້ເລີຍ' : (state.locationStatus === 'in_range' ? 'ຢູ່ໃນຂອບເຂດຫ້ອງການ' : state.locationStatus === 'out_range' ? 'ຢູ່ນອກຂອບເຂດຫ້ອງການ' : 'ກະລຸນາກວດສອບ GPS')}
+                </p>
+                ${(state.locationStatus === 'in_range' || (isSpecialUser() && state.distance)) ? `<p class="text-green-300 text-sm mt-0.5">✅ ໄລຍະຫ່າງ: ${state.distance}m ຈາກຫ້ອງການ</p>` : ''}
+                ${(state.locationStatus === 'out_range' && !isSpecialUser()) ? `<p class="text-red-300 text-sm mt-0.5">❌ ໄລຍະຫ່າງ: ${state.distance}m (ໄກເກີນໄປ)</p>` : ''}
               </div>
-            ` : ''}
+            </div>
           </div>
 
           <!-- Action Buttons -->
@@ -812,7 +814,7 @@
     }
 
     async function handleCheckIn() {
-      if (!state.location) {
+      if (!state.location && !isSpecialUser()) {
         state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນກົດເຂົ້າວຽກ';
         render();
         return;
@@ -857,7 +859,7 @@
     }
 
     async function handleCheckOut() {
-      if (!state.location) {
+      if (!state.location && !isSpecialUser()) {
         state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນກົດອອກວຽກ';
         render();
         return;

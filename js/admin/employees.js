@@ -2,7 +2,7 @@
 
 // Render Employee Management Section
 function renderEmployees() {
-    const activeEmployees = state.employees.filter(e => e.status === 'active');
+    const activeEmployees = state.employees.filter(e => e.status !== 'inactive');
 
     const content = `
         <div class="space-y-4">
@@ -107,7 +107,7 @@ function renderEmployeeRow(emp) {
 
 function filterEmployees() {
     const searchTerm = document.getElementById('empSearchInput').value.toLowerCase();
-    const activeEmployees = state.employees.filter(e => e.status === 'active');
+    const activeEmployees = state.employees.filter(e => e.status !== 'inactive');
 
     const filtered = activeEmployees.filter(emp =>
         emp.fullName.toLowerCase().includes(searchTerm) ||
