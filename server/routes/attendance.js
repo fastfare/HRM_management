@@ -68,8 +68,9 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
 
         // Bypass GPS for special users
         const employees = readJSON('employees.json');
-        const employee = employees.find(e => e.id === employeeId);
-        const isSpecial = employee && ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'].includes(employee.empCode);
+        const employee = employees.find(e => e.id === employeeId || e.empCode === employeeId);
+        const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
+        const isSpecial = employee && employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
             return res.json({
@@ -170,8 +171,9 @@ router.post('/checkout', (req, res) => {
 
         // Bypass GPS for special users
         const employees = readJSON('employees.json');
-        const employee = employees.find(e => e.id === employeeId);
-        const isSpecial = employee && ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'].includes(employee.empCode);
+        const employee = employees.find(e => e.id === employeeId || e.empCode === employeeId);
+        const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
+        const isSpecial = employee && employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
             return res.json({

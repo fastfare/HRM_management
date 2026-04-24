@@ -838,7 +838,7 @@
 
         if (result.success) {
           state.todayAttendance.shiftType = state.todayAttendance.shiftType || getUserShiftType(state.user);
-          state.todayAttendance.checkIn = result.time;
+          state.todayAttendance.checkIn = result.checkIn;
           state.todayAttendance.status = result.status;
           state.error = '';
           showSuccess(`✅ ${result.message} (${result.status === 'on_time' ? 'ປົກກະຕິ' : 'ສາຍ'})`);
@@ -881,7 +881,7 @@
         });
 
         if (result.success) {
-          state.todayAttendance.checkOut = result.time;
+          state.todayAttendance.checkOut = result.checkOut;
           state.todayAttendance.workHours = result.workHours;
           state.error = '';
           showSuccess(`✅ ${result.message} (ເຮັດວຽກ ${result.workHours} ຊົ່ວໂມງ)`);
