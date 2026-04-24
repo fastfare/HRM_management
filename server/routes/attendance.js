@@ -66,7 +66,12 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
             OFFICE_LNG
         );
 
-        if (distance > GEOFENCE_RADIUS) {
+        // Bypass GPS for special users
+        const employees = readJSON('employees.json');
+        const employee = employees.find(e => e.id === employeeId);
+        const isSpecial = employee && ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'].includes(employee.empCode);
+
+        if (distance > GEOFENCE_RADIUS && !isSpecial) {
             return res.json({
                 success: false,
                 error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)`,
@@ -163,7 +168,12 @@ router.post('/checkout', (req, res) => {
             OFFICE_LNG
         );
 
-        if (distance > GEOFENCE_RADIUS) {
+        // Bypass GPS for special users
+        const employees = readJSON('employees.json');
+        const employee = employees.find(e => e.id === employeeId);
+        const isSpecial = employee && ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'].includes(employee.empCode);
+
+        if (distance > GEOFENCE_RADIUS && !isSpecial) {
             return res.json({
                 success: false,
                 error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)`
