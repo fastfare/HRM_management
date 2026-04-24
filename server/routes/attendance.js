@@ -180,22 +180,6 @@ router.post('/checkout', (req, res) => {
     }
 });
 
-        res.json({
-            success: true,
-            message: 'ອອກວຽກສຳເລັດ',
-            checkOut: timeNow,
-            workHours: parseFloat(workHours)
-        });
-
-    } catch (error) {
-        console.error('Check-out error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
-    }
-});
-
 /**
  * GET /api/attendance/today/:employeeId
  * Get today's attendance record

@@ -1233,5 +1233,21 @@
     "workHours": 0,
     "notes": "",
     "createdAt": "2026-04-24T02:51:33.304Z"
+  },
+  {
+    "id": "f5a89dd6-f849-4f27-ab74-22fd925b8a4a",
+    "employeeId": "0281bab2-7ccd-49af-8d65-367a38e54bdc",
+    "date": "2026-04-24",
+    "shiftType": "standard",
+    "checkIn": "12:14:07",
+    "checkOut": null,
+    "checkInLat": 0,
+    "checkInLng": 0,
+    "checkOutLat": null,
+    "checkOutLng": null,
+    "checkInPhotoUrl": null,
+    "status": "late",
+    "workHours": 0,
+    "createdAt": "2026-04-24T05:14:07.951Z"
   }
 ]
