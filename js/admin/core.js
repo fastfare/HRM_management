@@ -862,7 +862,7 @@ function renderReportPreview(exportType) {
                                             <td class="p-2 border border-white/10 text-white text-left font-medium text-xs">${emp.fullName}</td>
                                             ${dateRange.map(d => {
                                                 const record = empAtt.find(a => a.date === d);
-                                                let otDisplay = '';
+                                                let otDisplay = '<span class="text-red-500/50">•</span>';
                                                 
                                                 if (record && record.checkOut) {
                                                     const workHours = parseFloat(record.workHours || 0);
@@ -873,11 +873,11 @@ function renderReportPreview(exportType) {
 
                                                     let dailyOT = isWorkDay ? Math.max(0, workHours - 8) : workHours;
                                                     if (dailyOT > 0) {
-                                                        otDisplay = dailyOT.toFixed(1);
+                                                        otDisplay = `<span class="text-violet-300 font-bold">${dailyOT.toFixed(1)}</span>`;
                                                         rowTotalOT += dailyOT;
                                                     }
                                                 }
-                                                return `<td class="p-1 border border-white/10 text-violet-300">${otDisplay}</td>`;
+                                                return `<td class="p-1 border border-white/10">${otDisplay}</td>`;
                                             }).join('')}
                                             <td class="p-2 border border-white/10 bg-violet-500/10 text-violet-400 font-bold">${rowTotalOT.toFixed(1)}</td>
                                         </tr>

@@ -86,6 +86,25 @@ function prepareAttendanceData() {
 
     return filtered.map(record => {
         const emp = state.employees.find(e => e.id === record.employeeId);
+        const workHours = parseFloat(record.workHours || 0);
+        
+        // Calculate OT for this specific record
+        const dateObj = new Date(record.date);
+        const dayOfWeek = dateObj.getDay();
+        const empWorkDays = emp?.workDays || [1, 2, 3, 4, 5, 6];
+        const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+        
+        let normalHours = 0;
+        let otHours = 0;
+        
+        if (isWorkDay) {
+            normalHours = Math.min(8, workHours);
+            otHours = Math.max(0, workHours - 8);
+        } else {
+            normalHours = 0;
+            otHours = workHours;
+        }
+
         return {
             'ວັນທີ່': record.date,
             'ລະຫັດພະນັກງານ': emp?.empCode || '-',
@@ -93,7 +112,9 @@ function prepareAttendanceData() {
             'ພະແນກ': emp?.department || '-',
             'ເຂົ້າວຽກ': record.checkIn || '-',
             'ອອກວຽກ': record.checkOut || '-',
-            'ຊົ່ວໂມງເຮັດວຽກ': record.workHours || 0,
+            'ຊົ່ວໂມງທັງໝົດ': workHours,
+            'ຊົ່ວໂມງປົກກະຕິ': normalHours,
+            'ໂມງ OT': parseFloat(otHours.toFixed(2)),
             'ສະຖານະ': record.checkIn ? (isLate(record.checkIn, record.shiftType) ? 'ມາສາຍ' : 'ປົກກະຕິ') : 'ຂາດວຽກ'
         };
     });
@@ -111,10 +132,27 @@ function prepareAttendanceSummaryData() {
     }
 
     return state.employees.filter(e => e.status !== 'inactive').map(emp => {
-        const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id);
-        const present = empAtt.filter(a => a.checkIn).length;
+        const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id && a.checkOut);
+        const present = empAtt.length;
         const late = empAtt.filter(a => isLate(a.checkIn, a.shiftType)).length;
-        const totalHours = empAtt.reduce((sum, a) => sum + (a.workHours || 0), 0);
+        
+        let totalNormal = 0;
+        let totalOT = 0;
+
+        empAtt.forEach(record => {
+            const workHours = parseFloat(record.workHours || 0);
+            const dateObj = new Date(record.date);
+            const dayOfWeek = dateObj.getDay();
+            const empWorkDays = emp.workDays || [1, 2, 3, 4, 5, 6];
+            const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+
+            if (isWorkDay) {
+                totalNormal += Math.min(8, workHours);
+                totalOT += Math.max(0, workHours - 8);
+            } else {
+                totalOT += workHours;
+            }
+        });
 
         return {
             'ລະຫັດພະນັກງານ': emp.empCode,
@@ -122,7 +160,9 @@ function prepareAttendanceSummaryData() {
             'ພະແນກ': emp.department,
             'ມື້ເຮັດວຽກທັງໝົດ': present,
             'ມາສາຍ (ຄັ້ງ)': late,
-            'ຊົ່ວໂມງລວມ': totalHours.toFixed(2)
+            'ຊົ່ວໂມງປົກກະຕິລວມ': totalNormal.toFixed(2),
+            'ຊົ່ວໂມງ OT ລວມ': totalOT.toFixed(2),
+            'ຊົ່ວໂມງທັງໝົດ': (totalNormal + totalOT).toFixed(2)
         };
     });
 }
