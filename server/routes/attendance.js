@@ -56,15 +56,18 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
 
         const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
         const isSpecial = employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
+        const currentEmpCode = employee.empCode || 'N/A';
         
         const distance = calculateDistance(parseFloat(lat || 0), parseFloat(lng || 0), OFFICE_LAT, OFFICE_LNG);
         console.log(`User: ${employee.fullName}, Distance: ${Math.round(distance)}m, Special: ${isSpecial}`);
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
-            console.warn('Check-in rejected: Out of range');
-            return res.json({ success: false, error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)` });
+            console.warn(`Check-in rejected: Out of range for user ${currentEmpCode}`);
+            return res.json({
+                success: false,
+                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m) [User: ${currentEmpCode}]`
+            });
         }
-
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         const timeNow = now.toTimeString().split(' ')[0];
@@ -132,7 +135,10 @@ router.post('/checkout', (req, res) => {
         const distance = calculateDistance(parseFloat(lat || 0), parseFloat(lng || 0), OFFICE_LAT, OFFICE_LNG);
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
-            return res.json({ success: false, error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)` });
+            return res.json({ 
+                success: false, 
+                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m) [User: ${employee.empCode}]` 
+            });
         }
 
         const now = new Date();
