@@ -37,207 +37,131 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 /**
  * POST /api/attendance/checkin
- * Check-in with GPS validation and optional photo
  */
 router.post('/checkin', uploadAttendancePhoto, (req, res) => {
     try {
         const { employeeId, lat, lng, shiftType = 'standard' } = req.body;
+        console.log('--- API CHECKIN ATTEMPT ---');
+        console.log('Payload:', { employeeId, lat, lng, shiftType });
 
-        if (!employeeId || lat === undefined || lng === undefined) {
-            return res.json({
-                success: false,
-                error: 'ຂໍ້ມູນບໍ່ຄົບຖ້ວນ'
-            });
-        }
+        if (!employeeId) return res.json({ success: false, error: 'ບໍ່ພົບລະຫັດພະນັກງານ' });
 
-        const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
-        if (shiftType === 'off') {
-            return res.json({
-                success: false,
-                error: 'ພະນັກງານນີ້ໄດ້ວັນພັກ, ບໍ່ສາມາດເຂົ້າວຽກ'
-            });
-        }
-
-        // Validate GPS
-        const distance = calculateDistance(
-            parseFloat(lat),
-            parseFloat(lng),
-            OFFICE_LAT,
-            OFFICE_LNG
-        );
-
-        // Bypass GPS for special users
         const employees = readJSON('employees.json');
         const employee = employees.find(e => e.id === employeeId || e.empCode === employeeId);
+        
+        if (!employee) {
+            console.error('Check-in error: Employee not found');
+            return res.json({ success: false, error: 'ບໍ່ພົບຂໍ້ມູນພະນັກງານໃນລະບົບ' });
+        }
+
         const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
-        const isSpecial = employee && employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
+        const isSpecial = employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
+        
+        const distance = calculateDistance(parseFloat(lat || 0), parseFloat(lng || 0), OFFICE_LAT, OFFICE_LNG);
+        console.log(`User: ${employee.fullName}, Distance: ${Math.round(distance)}m, Special: ${isSpecial}`);
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
-            return res.json({
-                success: false,
-                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)`,
-                distance: Math.round(distance)
-            });
+            console.warn('Check-in rejected: Out of range');
+            return res.json({ success: false, error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)` });
         }
 
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         const timeNow = now.toTimeString().split(' ')[0];
+        const actualEmployeeId = employee.id; // Always use UUID
 
-        // Check if already checked in today
         const attendance = readJSON('attendance.json');
-        const existing = attendance.find(rec =>
-            rec.employeeId === employeeId &&
-            rec.date === today &&
-            rec.checkIn
-        );
+        const existing = attendance.find(rec => rec.employeeId === actualEmployeeId && rec.date === today && rec.checkIn);
 
         if (existing) {
-            return res.json({
-                success: false,
-                error: 'ເຂົ້າວຽກແລ້ວມື້ນີ້'
-            });
+            return res.json({ success: false, error: 'ທ່ານໄດ້ເຂົ້າວຽກແລ້ວມື້ນີ້' });
         }
 
-        // Determine status based on shift
-        const lateThreshold = shift.lateThreshold || '09:15:00';
-        const status = timeNow <= lateThreshold ? 'on_time' : 'late';
+        const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
+        const status = timeNow <= (shift.lateThreshold || '09:15:00') ? 'on_time' : 'late';
 
-        // Get photo URL if uploaded
-        const checkInPhotoUrl = req.file ? `/uploads/attendance/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${req.file.filename}` : null;
-
-        // Create new record
         const newRecord = {
             id: uuidv4(),
-            employeeId,
+            employeeId: actualEmployeeId,
             date: today,
             shiftType,
             checkIn: timeNow,
             checkOut: null,
-            checkInLat: parseFloat(lat),
-            checkInLng: parseFloat(lng),
+            checkInLat: parseFloat(lat || 0),
+            checkInLng: parseFloat(lng || 0),
             checkOutLat: null,
             checkOutLng: null,
-            checkInPhotoUrl,
-            checkOutPhotoUrl: null,
+            checkInPhotoUrl: req.file ? `/uploads/attendance/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${req.file.filename}` : null,
             status,
             workHours: 0,
-            notes: '',
             createdAt: now.toISOString()
         };
 
         attendance.push(newRecord);
         writeJSON('attendance.json', attendance);
+        console.log('Check-in successful saved.');
 
-        res.json({
-            success: true,
-            message: 'ເຂົ້າວຽກສຳເລັດ',
-            checkIn: timeNow,
-            status,
-            distance: Math.round(distance)
-        });
+        res.json({ success: true, message: 'ເຂົ້າວຽກສຳເລັດ', checkIn: timeNow, status });
 
     } catch (error) {
-        console.error('Check-in error:', error);
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        console.error('Check-in Critical Error:', error);
+        res.status(500).json({ success: false, error: 'Server Error: ' + error.message });
     }
 });
 
 /**
  * POST /api/attendance/checkout
- * Check-out with GPS validation
  */
 router.post('/checkout', (req, res) => {
     try {
         const { employeeId, lat, lng } = req.body;
-
-        if (!employeeId || lat === undefined || lng === undefined) {
-            return res.json({
-                success: false,
-                error: 'ຂໍ້ມູນບໍ່ຄົບຖ້ວນ'
-            });
-        }
-
-        // Validate GPS
-        const distance = calculateDistance(
-            parseFloat(lat),
-            parseFloat(lng),
-            OFFICE_LAT,
-            OFFICE_LNG
-        );
-
-        // Bypass GPS for special users
+        console.log('--- API CHECKOUT ATTEMPT ---');
+        
         const employees = readJSON('employees.json');
         const employee = employees.find(e => e.id === employeeId || e.empCode === employeeId);
+        if (!employee) return res.json({ success: false, error: 'ບໍ່ພົບພະນັກງານ' });
+
         const specialCodes = ['dsax001', 'dsax002', 'dsax003', 'dsax004', 'dsax005'];
-        const isSpecial = employee && employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
+        const isSpecial = employee.empCode && specialCodes.includes(employee.empCode.toLowerCase().trim());
+        const distance = calculateDistance(parseFloat(lat || 0), parseFloat(lng || 0), OFFICE_LAT, OFFICE_LNG);
 
         if (distance > GEOFENCE_RADIUS && !isSpecial) {
-            return res.json({
-                success: false,
-                error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)`
-            });
+            return res.json({ success: false, error: `ຢູ່ນອກຂອບເຂດຫ້ອງການ (${Math.round(distance)}m)` });
         }
 
         const now = new Date();
         const today = now.toISOString().split('T')[0];
         const timeNow = now.toTimeString().split(' ')[0];
+        const actualEmployeeId = employee.id;
 
-        // Find today's record
         const attendance = readJSON('attendance.json');
-        const recordIndex = attendance.findIndex(rec =>
-            rec.employeeId === employeeId &&
-            rec.date === today
-        );
+        const recordIndex = attendance.findIndex(rec => rec.employeeId === actualEmployeeId && rec.date === today);
 
-        if (recordIndex === -1) {
-            return res.json({
-                success: false,
-                error: 'ບໍ່ພົບບັນທຶກເຂົ້າວຽກມື້ນີ້'
-            });
-        }
+        if (recordIndex === -1) return res.json({ success: false, error: 'ບໍ່ພົບບັນທຶກເຂົ້າວຽກມື້ນີ້' });
+        if (attendance[recordIndex].checkOut) return res.json({ success: false, error: 'ທ່ານໄດ້ອອກວຽກແລ້ວ' });
 
         const record = attendance[recordIndex];
-
-        if (!record.checkIn) {
-            return res.json({
-                success: false,
-                error: 'ກະລຸນາກົດເຂົ້າວຽກກ່ອນ'
-            });
-        }
-
-        if (record.checkOut) {
-            return res.json({
-                success: false,
-                error: 'ອອກວຽກແລ້ວມື້ນີ້'
-            });
-        }
-
-        // Determine shift info for checkout (from the initial checkin record whenever available)
-        const shiftType = record.shiftType || 'standard';
-        const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
-
-        // Calculate work hours
         const checkInTime = new Date(`${today} ${record.checkIn}`);
         const checkOutTime = new Date(`${today} ${timeNow}`);
-        const diffMs = checkOutTime - checkInTime;
-        const diffHrs = (diffMs / (1000 * 60 * 60)) - 1; // minus 1 hour lunch
-        const workHours = Math.max(0, diffHrs).toFixed(2);
+        const workHours = Math.max(0, (checkOutTime - checkInTime) / (1000 * 60 * 60) - 1).toFixed(2);
 
-        // Update record
         attendance[recordIndex] = {
             ...record,
             checkOut: timeNow,
-            checkOutLat: parseFloat(lat),
-            checkOutLng: parseFloat(lng),
-            workHours: parseFloat(workHours),
-            shiftType
+            checkOutLat: parseFloat(lat || 0),
+            checkOutLng: parseFloat(lng || 0),
+            workHours: parseFloat(workHours)
         };
 
         writeJSON('attendance.json', attendance);
+        console.log('Check-out successful saved.');
+        res.json({ success: true, message: 'ອອກວຽກສຳເລັດ', checkOut: timeNow, workHours });
+
+    } catch (error) {
+        console.error('Check-out Critical Error:', error);
+        res.status(500).json({ success: false, error: 'Server Error' });
+    }
+});
 
         res.json({
             success: true,

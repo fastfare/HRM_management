@@ -814,121 +814,164 @@
     }
 
     async function handleCheckIn() {
-      console.log('Check-in started');
-      if (!state.location && !isSpecialUser()) {
-        state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນກົດເຂົ້າວຽກ';
-        render();
-        return;
-      }
-
-      state.loading = true;
-      state.error = '';
-      render();
-
-      const sendCheckIn = async (lat, lng) => {
-        try {
-          console.log('Sending check-in request...');
-          const result = await callAPI('/api/attendance/checkin', {
-            employeeId: state.user.id,
-            lat: lat || 0,
-            lng: lng || 0,
-            shiftType: state.todayAttendance.shiftType || getUserShiftType(state.user)
-          }, 'POST');
-
-          if (result.success) {
-            state.todayAttendance.checkIn = result.checkIn;
-            state.todayAttendance.status = result.status;
-            state.error = '';
-            showSuccess(`✅ ເຂົ້າວຽກສຳເລັດ! (${result.checkIn})`);
-            await loadAttendanceHistory();
-          } else {
-            state.error = '❌ ' + result.error;
-          }
-        } catch (e) {
-          console.error('API Error:', e);
-          state.error = '❌ ເກີດຂໍ້ຜິດພາດໃນການເຊື່ອມຕໍ່';
+      console.log('>>> BUTTON CLICK: CHECK-IN');
+      try {
+        if (!state.user) {
+          alert('ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່');
+          return;
         }
-        state.loading = false;
-        render();
-      };
 
-      if (isSpecialUser()) {
-        let done = false;
-        navigator.geolocation.getCurrentPosition(
-          (pos) => { if(!done){ done=true; sendCheckIn(pos.coords.latitude, pos.coords.longitude); } },
-          (err) => { if(!done){ done=true; sendCheckIn(0, 0); } },
-          { timeout: 5000 }
-        );
-        setTimeout(() => { if(!done){ done=true; sendCheckIn(0, 0); } }, 6000);
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => sendCheckIn(pos.coords.latitude, pos.coords.longitude),
-          (err) => {
-            state.error = '❌ ບໍ່ສາມາດດຶງຕຳແໜ່ງໄດ້: ' + err.message;
+        if (!state.location && !isSpecialUser()) {
+          state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນກົດເຂົ້າວຽກ';
+          render();
+          return;
+        }
+
+        state.loading = true;
+        state.error = '';
+        render();
+
+        const sendCheckIn = async (lat, lng) => {
+          try {
+            console.log('Calling API /checkin...');
+            const result = await callAPI('/api/attendance/checkin', {
+              employeeId: state.user.id,
+              lat: lat || 0,
+              lng: lng || 0,
+              shiftType: state.todayAttendance.shiftType || getUserShiftType(state.user)
+            });
+
+            console.log('API Result:', result);
+            if (result.success) {
+              state.successMessage = '✅ ເຂົ້າວຽກສຳເລັດ!';
+              // Refresh all data to update UI
+              await loadTodayAttendance();
+              await loadAttendanceHistory();
+              await loadMonthlyStats();
+              
+              setTimeout(() => { state.successMessage = ''; render(); }, 3000);
+            } else {
+              state.error = '❌ ' + (result.error || 'ເກີດຂໍ້ຜິດພາດ');
+            }
+          } catch (apiErr) {
+            console.error('Check-in API Error:', apiErr);
+            state.error = '❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ກັບ Server';
+          } finally {
             state.loading = false;
             render();
-          },
-          { timeout: 10000 }
-        );
+          }
+        };
+
+        if (isSpecialUser()) {
+          console.log('Special User Path - Bypassing blocking GPS');
+          let gpsCaptured = false;
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { 
+              if(!gpsCaptured) {
+                gpsCaptured = true;
+                sendCheckIn(pos.coords.latitude, pos.coords.longitude);
+              }
+            },
+            (err) => {
+              if(!gpsCaptured) {
+                gpsCaptured = true;
+                console.warn('GPS Fail for Special User, using fallback:', err.message);
+                sendCheckIn(0, 0);
+              }
+            },
+            { timeout: 4000, enableHighAccuracy: true }
+          );
+          
+          // Safety fallback for special users if navigator hangs
+          setTimeout(() => {
+            if(!gpsCaptured) {
+              gpsCaptured = true;
+              console.warn('GPS Timeout for Special User, using fallback');
+              sendCheckIn(0, 0);
+            }
+          }, 5000);
+        } else {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => sendCheckIn(pos.coords.latitude, pos.coords.longitude),
+            (err) => {
+              state.error = '❌ ບໍ່ສາມາດດຶງ GPS: ' + err.message;
+              state.loading = false;
+              render();
+            },
+            { timeout: 8000, enableHighAccuracy: true }
+          );
+        }
+      } catch (fatalErr) {
+        console.error('Check-in Fatal Error:', fatalErr);
+        state.loading = false;
+        state.error = '❌ ຂໍ້ຜິດພາດພາຍໃນ: ' + fatalErr.message;
+        render();
       }
     }
 
     async function handleCheckOut() {
-      console.log('Check-out started');
-      if (!state.location && !isSpecialUser()) {
-        state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນກົດອອກວຽກ';
-        render();
-        return;
-      }
-
-      state.loading = true;
-      state.error = '';
-      render();
-
-      const sendCheckOut = async (lat, lng) => {
-        try {
-          console.log('Sending check-out request...');
-          const result = await callAPI('/api/attendance/checkout', {
-            employeeId: state.user.id,
-            lat: lat || 0,
-            lng: lng || 0
-          }, 'POST');
-
-          if (result.success) {
-            state.todayAttendance.checkOut = result.checkOut;
-            state.todayAttendance.workHours = result.workHours;
-            state.error = '';
-            showSuccess(`✅ ອອກວຽກສຳເລັດ! (ເຮັດວຽກ ${result.workHours}ຊມ)`);
-            await loadAttendanceHistory();
-          } else {
-            state.error = '❌ ' + result.error;
-          }
-        } catch (e) {
-          console.error('API Error:', e);
-          state.error = '❌ ເກີດຂໍ້ຜິດພາດໃນການເຊື່ອມຕໍ່';
+      console.log('>>> BUTTON CLICK: CHECK-OUT');
+      try {
+        if (!state.user) return;
+        
+        if (!state.location && !isSpecialUser()) {
+          state.error = 'ກະລຸນາກວດສອບ GPS ກ່ອນ';
+          render();
+          return;
         }
-        state.loading = false;
-        render();
-      };
 
-      if (isSpecialUser()) {
-        let done = false;
-        navigator.geolocation.getCurrentPosition(
-          (pos) => { if(!done){ done=true; sendCheckOut(pos.coords.latitude, pos.coords.longitude); } },
-          (err) => { if(!done){ done=true; sendCheckOut(0, 0); } },
-          { timeout: 5000 }
-        );
-        setTimeout(() => { if(!done){ done=true; sendCheckOut(0, 0); } }, 6000);
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => sendCheckOut(pos.coords.latitude, pos.coords.longitude),
-          (err) => {
-            state.error = '❌ ບໍ່ສາມາດດຶງຕຳແໜ່ງໄດ້: ' + err.message;
+        state.loading = true;
+        state.error = '';
+        render();
+
+        const sendCheckOut = async (lat, lng) => {
+          try {
+            const result = await callAPI('/api/attendance/checkout', {
+              employeeId: state.user.id,
+              lat: lat || 0,
+              lng: lng || 0
+            });
+
+            if (result.success) {
+              state.successMessage = '✅ ອອກວຽກສຳເລັດ!';
+              await loadTodayAttendance();
+              await loadAttendanceHistory();
+              await loadMonthlyStats();
+              setTimeout(() => { state.successMessage = ''; render(); }, 3000);
+            } else {
+              state.error = '❌ ' + (result.error || 'ເກີດຂໍ້ຜິດພາດ');
+            }
+          } catch (apiErr) {
+            state.error = '❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ Server';
+          } finally {
             state.loading = false;
             render();
-          },
-          { timeout: 10000 }
-        );
+          }
+        };
+
+        if (isSpecialUser()) {
+          let gpsCaptured = false;
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { if(!gpsCaptured){ gpsCaptured=true; sendCheckOut(pos.coords.latitude, pos.coords.longitude); } },
+            (err) => { if(!gpsCaptured){ gpsCaptured=true; sendCheckOut(0, 0); } },
+            { timeout: 4000 }
+          );
+          setTimeout(() => { if(!gpsCaptured){ gpsCaptured=true; sendCheckOut(0, 0); } }, 5000);
+        } else {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => sendCheckOut(pos.coords.latitude, pos.coords.longitude),
+            (err) => {
+              state.error = '❌ GPS ຜິດພາດ: ' + err.message;
+              state.loading = false;
+              render();
+            },
+            { timeout: 8000 }
+          );
+        }
+      } catch (fatalErr) {
+        state.loading = false;
+        state.error = '❌ ຂໍ້ຜິດພາດ: ' + fatalErr.message;
+        render();
       }
     }
 
