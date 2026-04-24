@@ -151,7 +151,7 @@ function openRegisterModal() {
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ພະແນກ <span class="text-red-400">*</span></label>
-                    <select id="regDepartment" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500">
+                    <select id="regDepartment" class="w-full px-4 py-3 bg-[#0f0f1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500">
                         <option value="">-- ເລືອກພະແນກ --</option>
                         <option>IT</option>
                         <option>HR</option>
@@ -180,6 +180,14 @@ function openRegisterModal() {
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ວັນທີ່ເຂົ້າວຽກ</label>
                     <input id="regHireDate" type="date" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500" />
+                </div>
+                <div>
+                    <label class="text-white/70 text-sm mb-1 block">ປະເພດກະ (Shift) <span class="text-red-400">*</span></label>
+                    <select id="regShift" class="w-full px-4 py-3 bg-[#0f0f1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500">
+                        ${Object.entries(SHIFT_RULES).map(([key, val]) => `
+                            <option value="${key}">${val.label}</option>
+                        `).join('')}
+                    </select>
                 </div>
             </div>
             
@@ -228,6 +236,7 @@ async function handleRegister() {
         phone,
         baseSalary,
         hireDate,
+        shiftType: document.getElementById('regShift').value,
         role: 'employee'
     };
 
@@ -271,7 +280,7 @@ function openEditModal(empId) {
                 </div>
                 <div>
                     <label class="text-white/70 text-sm mb-1 block">ພະແນກ</label>
-                    <select id="editDepartment" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
+                    <select id="editDepartment" class="w-full px-4 py-3 bg-[#0f0f1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
                         <option ${emp.department === 'IT' ? 'selected' : ''}>IT</option>
                         <option ${emp.department === 'HR' ? 'selected' : ''}>HR</option>
                         <option ${emp.department === 'Finance' ? 'selected' : ''}>Finance</option>
@@ -300,6 +309,14 @@ function openEditModal(empId) {
                     <label class="text-white/70 text-sm mb-1 block">ວັນທີ່ເຂົ້າວຽກ</label>
                     <input id="editHireDate" value="${emp.hireDate || ''}" type="date" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
                 </div>
+                <div>
+                    <label class="text-white/70 text-sm mb-1 block">ປະເພດກະ (Shift)</label>
+                    <select id="editShift" class="w-full px-4 py-3 bg-[#0f0f1a] border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
+                        ${Object.entries(SHIFT_RULES).map(([key, val]) => `
+                            <option value="${key}" ${emp.shiftType === key ? 'selected' : ''}>${val.label}</option>
+                        `).join('')}
+                    </select>
+                </div>
             </div>
             
             <div class="flex gap-3">
@@ -325,7 +342,8 @@ async function handleEdit() {
         email: document.getElementById('editEmail').value.trim(),
         phone: document.getElementById('editPhone').value.trim(),
         baseSalary: parseFloat(document.getElementById('editSalary').value) || 0,
-        hireDate: document.getElementById('editHireDate').value
+        hireDate: document.getElementById('editHireDate').value,
+        shiftType: document.getElementById('editShift').value
     };
 
     const result = await callAPI(`/api/employees/${empId}`, data, 'PUT');

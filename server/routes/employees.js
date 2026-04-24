@@ -70,6 +70,7 @@ router.post('/', (req, res) => {
             baseSalary: parseFloat(baseSalary) || 0,
             pin: pin.toString(),
             role: role || 'user',
+            shiftType: req.body.shiftType || 'standard',
             hireDate: new Date().toISOString().split('T')[0],
             status: 'active',
             createdAt: now,
@@ -128,6 +129,7 @@ router.put('/:id', (req, res) => {
             ...(baseSalary !== undefined && { baseSalary: parseFloat(baseSalary) }),
             ...(hireDate !== undefined && { hireDate }),
             ...(role && { role }),
+            ...(req.body.shiftType && { shiftType: req.body.shiftType }),
             ...(status && { status }),
             updatedAt: new Date().toISOString()
         };

@@ -315,4 +315,72 @@ router.get('/', (req, res) => {
     }
 });
 
+/**
+ * PUT /api/attendance/:id
+ * Update attendance record (admin)
+ */
+router.put('/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { checkIn, checkOut, date, shiftType } = req.body;
+
+        const attendance = readJSON('attendance.json');
+        const recordIndex = attendance.findIndex(rec => rec.id === id);
+
+        if (recordIndex === -1) {
+            return res.json({
+                success: false,
+                error: 'ບໍ່ພົບບັນທຶກ'
+            });
+        }
+
+        const record = attendance[recordIndex];
+        const updatedDate = date || record.date;
+        const updatedCheckIn = checkIn || record.checkIn;
+        const updatedCheckOut = checkOut || record.checkOut;
+        const updatedShiftType = shiftType || record.shiftType || 'standard';
+
+        // Recalculate work hours
+        let workHours = 0;
+        if (updatedCheckIn && updatedCheckOut) {
+            const start = new Date(`${updatedDate} ${updatedCheckIn}`);
+            const end = new Date(`${updatedDate} ${updatedCheckOut}`);
+            const diffMs = end - start;
+            const diffHrs = (diffMs / (1000 * 60 * 60)) - 1; // minus 1 hour lunch
+            workHours = parseFloat(Math.max(0, diffHrs).toFixed(2));
+        }
+
+        // Recalculate status
+        const shift = SHIFT_RULES[updatedShiftType] || SHIFT_RULES.standard;
+        const lateThreshold = shift.lateThreshold || '09:15:00';
+        const status = updatedCheckIn <= lateThreshold ? 'on_time' : 'late';
+
+        attendance[recordIndex] = {
+            ...record,
+            date: updatedDate,
+            checkIn: updatedCheckIn,
+            checkOut: updatedCheckOut,
+            shiftType: updatedShiftType,
+            workHours,
+            status,
+            updatedAt: new Date().toISOString()
+        };
+
+        writeJSON('attendance.json', attendance);
+
+        res.json({
+            success: true,
+            message: 'ອັບເດດສຳເລັດ',
+            record: attendance[recordIndex]
+        });
+
+    } catch (error) {
+        console.error('Update attendance error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
