@@ -14,7 +14,7 @@ const SHIFT_RULES = {
 
 const DEFAULT_SHIFT = 'standard';
 
-// A sample shift assignment map (ปรับตามรูปได้ตามต้องการ)
+/*
 const EMPLOYEE_SHIFT_ASSIGNMENTS = {
     'SOMPHONE XAYASA': 'off',
     'CHAMPA LUANGAPHAI': 'off',
@@ -36,6 +36,7 @@ const EMPLOYEE_SHIFT_ASSIGNMENTS = {
     'SOUKSAVANH PHANNIVONGSOR': 'standard',
     'DET THESAVONG': 'off'
 };
+*/
 
 // ============ STATE ============
 let state = {    user: null,
@@ -68,6 +69,8 @@ const menus = [
         id: 'reports', icon: 'bar-chart-3', label: 'ລາຍງານ',
         children: [
             { id: 'report-attendance', icon: 'clock', label: 'ລາຍງານເຂົ້າ-ອອກ', exportType: 'attendance' },
+            { id: 'report-attendance-summary', icon: 'calendar-check', label: 'ສະຫຼຸບມື້ເຮັດວຽກ', exportType: 'attendance-summary' },
+            { id: 'report-attendance-matrix', icon: 'table', label: 'ຕາຕະລາງການມາວຽກ', exportType: 'attendance-matrix' },
             { id: 'report-employees', icon: 'users', label: 'ຂໍ້ມູນພະນັກງານ', exportType: 'employees' },
             { id: 'report-leaves', icon: 'calendar', label: 'ລາຍງານການລາ', exportType: 'leaves' },
             { id: 'report-payroll', icon: 'dollar-sign', label: 'ລາຍງານເງິນເດືອນ', exportType: 'payroll' },
@@ -78,6 +81,8 @@ const menus = [
 
 const exportOptions = [
     { id: 'attendance', label: 'ລາຍງານເຂົ້າ-ອອກວຽກ', icon: 'clock', desc: 'ບັນທຶກເວລາເຂົ້າ-ອອກທັງໝົດ' },
+    { id: 'attendance-summary', label: 'ສະຫຼຸບມື້ເຮັດວຽກ', icon: 'calendar-check', desc: 'ສະຫຼຸບມື້ມາການລວມຂອງພະນັກງານ' },
+    { id: 'attendance-matrix', label: 'ຕາຕະລາງການມາວຽກ', icon: 'table', desc: 'ລາຍງານການມາວຽກແບບ Matrix ລາຍເດືອນ' },
     { id: 'employees', label: 'ຂໍ້ມູນພະນັກງານ', icon: 'users', desc: 'ລາຍຊື່ ແລະ ຂໍ້ມູນພະນັກງານ' },
     { id: 'leaves', label: 'ລາຍງານການລາ', icon: 'calendar', desc: 'ປະຫວັດການຂໍລາທັງໝົດ' },
     { id: 'payroll', label: 'ລາຍງານເງິນເດືອນ', icon: 'dollar-sign', desc: 'ສະຫຼຸບເງິນເດືອນປະຈຳເດືອນ' },
@@ -194,7 +199,7 @@ function calculateDepartmentData() {
 }
 
 function getEmployeeShift(emp) {
-    const assigned = EMPLOYEE_SHIFT_ASSIGNMENTS[emp.fullName] || emp.shiftType || DEFAULT_SHIFT;
+    const assigned = emp.shiftType || DEFAULT_SHIFT;
     return SHIFT_RULES[assigned] ? assigned : DEFAULT_SHIFT;
 }
 
@@ -637,48 +642,113 @@ function renderReportSubItem() {
 function renderReportPreview(exportType) {
     switch (exportType) {
         case 'attendance': {
-            const selectedDate = document.getElementById('reportAttendanceDate')?.value || new Date().toISOString().split('T')[0];
-            const todayAtt = getAttendanceByDate(selectedDate);
-            const present = todayAtt.filter(a => a.status === 'working').length;
-            const late = todayAtt.filter(a => a.status === 'late').length;
-            const absent = todayAtt.filter(a => a.status === 'absent').length;
-            const off = todayAtt.filter(a => a.status === 'off').length;
-            const total = todayAtt.length;
-            const attendanceRate = total ? Math.round((present / (total - off || 1)) * 100) : 0;
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+            const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
+
+            const filtered = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
 
             return `
-                <div class="flex flex-wrap items-end gap-3 mb-4">
+                <div class="flex flex-wrap items-end gap-3 mb-6">
                     <div>
-                        <label for="reportAttendanceDate" class="text-white/70 text-sm">ເລືອກວັນທີ່</label>
-                        <input
-                            id="reportAttendanceDate"
-                            type="date"
-                            value="${selectedDate}"
-                            class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white"
-                            onchange="renderReportSubItem()"
-                        />
+                        <label class="text-white/70 text-sm block mb-1">ເລີ່ມວັນທີ່</label>
+                        <input id="reportStartDate" type="date" value="${startDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
+                    </div>
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ຫາວັນທີ່</label>
+                        <input id="reportEndDate" type="date" value="${endDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
                     </div>
                 </div>
-                <h4 class="text-white font-semibold mb-4">📊 ສະຫຼຸບເຂົ້າ-ອອກວຽກ: ${selectedDate}</h4>
-                <div class="grid grid-cols-4 gap-4 mb-4">
-                    <div class="bg-green-500/10 rounded-xl p-4 text-center">
-                        <p class="text-green-400 text-2xl font-bold">${present}</p>
-                        <p class="text-white/60 text-sm">ເຮັດວຽກ</p>
+                <h4 class="text-white font-semibold mb-4">📄 ລາຍລະອຽດການເຂົ້າ-ອອກວຽກ (${filtered.length} ລາຍການ)</h4>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left text-sm">
+                        <thead class="sticky top-0 bg-[#1a1a2e] text-white/50 border-b border-white/10">
+                            <tr>
+                                <th class="pb-3">ວັນທີ່</th>
+                                <th class="pb-3">ພະນັກງານ</th>
+                                <th class="pb-3">ເຂົ້າວຽກ</th>
+                                <th class="pb-3">ອອກວຽກ</th>
+                                <th class="pb-3">ສະຖານະ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${filtered.slice(0, 50).map(a => {
+                const emp = state.employees.find(e => e.id === a.employeeId);
+                return `
+                                <tr>
+                                    <td class="py-2 text-white/70">${a.date}</td>
+                                    <td class="py-2 text-white font-medium">${emp?.fullName || '-'}</td>
+                                    <td class="py-2 text-white">${a.checkIn || '-'}</td>
+                                    <td class="py-2 text-white">${a.checkOut || '-'}</td>
+                                    <td class="py-2 text-white/70">${isLate(a.checkIn, a.shiftType) ? 'ມາສາຍ' : 'ປົກກະຕິ'}</td>
+                                </tr>
+                            `;
+            }).join('')}
+                            ${filtered.length > 50 ? '<tr><td colspan="5" class="py-4 text-center text-white/30 italic">... ແລະ ອີກ ' + (filtered.length - 50) + ' ລາຍການ ...</td></tr>' : ''}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        case 'attendance-summary': {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+            const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
+
+            const filteredAttendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
+
+            const summary = state.employees.filter(e => e.status === 'active').map(emp => {
+                const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id);
+                const present = empAtt.filter(a => a.checkIn).length;
+                const late = empAtt.filter(a => isLate(a.checkIn, a.shiftType)).length;
+                const totalHours = empAtt.reduce((sum, a) => sum + (a.workHours || 0), 0);
+
+                return {
+                    ...emp,
+                    present,
+                    late,
+                    totalHours: totalHours.toFixed(1)
+                };
+            }).sort((a, b) => b.present - a.present);
+
+            return `
+                <div class="flex flex-wrap items-end gap-3 mb-6">
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ເລີ່ມວັນທີ່</label>
+                        <input id="reportStartDate" type="date" value="${startDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
                     </div>
-                    <div class="bg-yellow-500/10 rounded-xl p-4 text-center">
-                        <p class="text-yellow-400 text-2xl font-bold">${late}</p>
-                        <p class="text-white/60 text-sm">ມາສາຍ</p>
-                    </div>
-                    <div class="bg-red-500/10 rounded-xl p-4 text-center">
-                        <p class="text-red-400 text-2xl font-bold">${absent}</p>
-                        <p class="text-white/60 text-sm">ຂາດວຽກ</p>
-                    </div>
-                    <div class="bg-slate-500/10 rounded-xl p-4 text-center">
-                        <p class="text-slate-200 text-2xl font-bold">${off}</p>
-                        <p class="text-white/60 text-sm">ວັນພັກ</p>
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ຫາວັນທີ່</label>
+                        <input id="reportEndDate" type="date" value="${endDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
                     </div>
                 </div>
-                <p class="text-white/50 text-sm">ຂໍ້ມູນ attendance ທັງໝົດ: ${state.attendance.length} ລາຍການ; ອັດຕາ: ${attendanceRate}%</p>
+                <h4 class="text-white font-semibold mb-4">📊 ສະຫຼຸບມື້ມາການລວມ</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="text-white/50 text-sm border-b border-white/10">
+                            <tr>
+                                <th class="pb-3">ພະນັກງານ</th>
+                                <th class="pb-3">ພະແນກ</th>
+                                <th class="pb-3 text-center">ມື້ເຮັດວຽກ</th>
+                                <th class="pb-3 text-center">ມາສາຍ</th>
+                                <th class="pb-3 text-center">ຊົ່ວໂມງລວມ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${summary.map(s => `
+                                <tr>
+                                    <td class="py-3 text-white font-medium">${s.fullName}</td>
+                                    <td class="py-3 text-white/70 text-sm">${s.department}</td>
+                                    <td class="py-3 text-center text-green-400 font-bold">${s.present}</td>
+                                    <td class="py-3 text-center text-yellow-400">${s.late}</td>
+                                    <td class="py-3 text-center text-white/70">${s.totalHours} ຊມ</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
             `;
         }
         case 'employees': {
@@ -730,28 +800,94 @@ function renderReportPreview(exportType) {
                 </div>
             `;
         }
-        case 'summary':
+        case 'attendance-matrix': {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+            const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
+            
+            // Calculate all dates in range
+            const getDatesInRange = (start, end) => {
+                const dates = [];
+                let curr = new Date(start);
+                const last = new Date(end);
+                while (curr <= last) {
+                    dates.push(new Date(curr).toISOString().split('T')[0]);
+                    curr.setDate(curr.getDate() + 1);
+                }
+                return dates;
+            };
+
+            const dateRange = getDatesInRange(startDate, endDate);
+            const activeEmps = state.employees.filter(e => e.status === 'active');
+            
             return `
-                <h4 class="text-white font-semibold mb-4">📈 ສະຫຼຸບລວມ</h4>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <span class="text-white/70">ພະນັກງານທັງໝົດ</span>
-                        <span class="text-white font-bold">${state.stats.totalEmployees}</span>
+                <div class="flex flex-wrap items-end gap-3 mb-6">
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ເລີ່ມວັນທີ່</label>
+                        <input id="reportStartDate" type="date" value="${startDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
                     </div>
-                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <span class="text-white/70">ເຂົ້າວຽກມື້ນີ້</span>
-                        <span class="text-white font-bold">${state.stats.presentToday}</span>
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <span class="text-white/70">ມາສາຍ</span>
-                        <span class="text-white font-bold">${state.stats.lateToday}</span>
-                    </div>
-                    <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
-                        <span class="text-white/70">ອັດຕາການເຂົ້າວຽກ</span>
-                        <span class="text-white font-bold">${state.stats.attendanceRate}%</span>
+                    <div>
+                        <label class="text-white/70 text-sm block mb-1">ຫາວັນທີ່</label>
+                        <input id="reportEndDate" type="date" value="${endDate}" onchange="renderReportSubItem()" class="bg-[#1a1a2e] border border-white/10 rounded-lg px-3 py-2 text-white" />
                     </div>
                 </div>
+
+                <div class="text-center mb-6">
+                    <h3 class="text-white text-xl font-bold">ລາຍງານມື້ມາການທັງໝົດຂອງພະນັກງານ</h3>
+                    <p class="text-white/60">ຊ່ວງເວລາ: ${startDate.split('-').reverse().join('/')} - ${endDate.split('-').reverse().join('/')}</p>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-[10px] text-center border-collapse">
+                        <thead>
+                            <tr class="bg-white/5 text-white/70">
+                                <th class="p-2 border border-white/10 text-left">ລຳດັບ</th>
+                                <th class="p-2 border border-white/10 text-left">ລະຫັດ</th>
+                                <th class="p-2 border border-white/10 text-left min-w-[120px]">ຊື່ ແລະ ນາມສະກຸນ</th>
+                                ${dateRange.map(d => `<th class="p-1 border border-white/10 min-w-[25px]">${d.split('-')[2]}</th>`).join('')}
+                                <th class="p-2 border border-white/10 bg-green-500/20 text-green-400">ລວມ</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-white/5">
+                            ${activeEmps.map((emp, idx) => {
+                const empAtt = state.attendance.filter(a => a.employeeId === emp.id && a.date >= startDate && a.date <= endDate);
+                let total = 0;
+
+                return `
+                                    <tr>
+                                        <td class="p-2 border border-white/10 text-white/50">${idx + 1}</td>
+                                        <td class="p-2 border border-white/10 text-white/50 text-left">${emp.empCode}</td>
+                                        <td class="p-2 border border-white/10 text-white text-left font-medium text-xs">${emp.fullName}</td>
+                                        ${dateRange.map(d => {
+                    const record = empAtt.find(a => a.date === d);
+                    const isPresent = record && record.checkIn && record.checkOut;
+                    const isIncomplete = record && (!record.checkIn || !record.checkOut);
+                    
+                    if (isPresent) total++;
+                    
+                    let cellClass = 'text-white/10';
+                    let cellContent = '-';
+                    
+                    if (isPresent) {
+                        cellClass = 'bg-green-500/20 text-green-400';
+                        cellContent = '✓';
+                    } else if (isIncomplete) {
+                        cellClass = 'bg-red-500/20 text-red-400';
+                        cellContent = '✕';
+                    }
+
+                    return `<td class="p-1 border border-white/10 ${cellClass}">${cellContent}</td>`;
+                }).join('')}
+                                        <td class="p-2 border border-white/10 bg-green-500/20 text-green-400 font-bold">${total}</td>
+                                    </tr>
+                                `;
+            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
             `;
+        }
         default:
             return '<p class="text-white/50">ບໍ່ມີຂໍ້ມູນ</p>';
     }

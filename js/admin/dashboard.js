@@ -269,6 +269,8 @@ function renderAttendanceTable() {
 
 function renderAttendanceRow(emp) {
     const workingHours = emp.checkIn && emp.checkOut ? calculateWorkingHours(emp.checkIn, emp.checkOut) : '-';
+    // Find the original attendance record ID from state.attendance
+    const record = state.attendance.find(a => a.employeeId === emp.id && a.date === emp.date);
 
     let statusLabel = emp.status === 'working' ? 'ປົກກະຕິ' : emp.status === 'late' ? 'ມາສາຍ' : emp.status === 'absent' ? 'ຂາດວຽກ' : 'ພັກ';
     let statusClass = emp.status === 'working' ? 'bg-green-500/20 text-green-400' : emp.status === 'late' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400';
@@ -297,12 +299,138 @@ function renderAttendanceRow(emp) {
                 ${statusLabel}
             </span>
             <div class="flex justify-center gap-2">
-                <button class="p-2 hover:bg-white/10 rounded-lg text-blue-400 transition-colors">
+                <button onclick="openEditAttendanceModal('${record ? record.id : ''}', '${emp.id}', '${emp.date}')" class="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-colors" title="ແກ້ໄຂ">
+                    <i data-lucide="edit" class="w-4 h-4"></i>
+                </button>
+                <button class="p-2 hover:bg-white/10 rounded-lg text-white/50 transition-colors">
                     <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>
     `;
+}
+
+// ============ ATTENDANCE EDIT MODAL ============
+
+function openEditAttendanceModal(recordId, employeeId, date) {
+    const emp = state.employees.find(e => e.id === employeeId);
+    const record = state.attendance.find(a => a.id === recordId) || {
+        id: null,
+        employeeId,
+        date,
+        checkIn: '',
+        checkOut: '',
+        shiftType: getEmployeeShift(emp)
+    };
+
+    const modal = document.getElementById('editAttendanceModal');
+    modal.innerHTML = `
+        <div class="bg-[#1a1a2e] rounded-3xl p-6 w-full max-w-md border border-white/10 shadow-2xl">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-white text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="clock" class="w-6 h-6 text-blue-400"></i>
+                    ແກ້ໄຂເວລາ: ${emp.fullName}
+                </h3>
+                <button onclick="closeModal('editAttendanceModal')" class="text-white/50 hover:text-white transition-colors">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="text-white/70 text-sm mb-1 block">ວັນທີ່</label>
+                    <input id="editAttDate" type="date" value="${date}" disabled class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white/50 focus:outline-none" />
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-white/70 text-sm mb-1 block">ເວລາເຂົ້າວຽກ</label>
+                        <input id="editAttCheckIn" type="time" step="1" value="${record.checkIn || ''}" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div>
+                        <label class="text-white/70 text-sm mb-1 block">ເວລາອອກວຽກ</label>
+                        <input id="editAttCheckOut" type="time" step="1" value="${record.checkOut || ''}" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500" />
+                    </div>
+                </div>
+
+                <div>
+                    <label class="text-white/70 text-sm mb-1 block">ປະເພດກະ (Shift)</label>
+                    <select id="editAttShift" class="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500">
+                        ${Object.entries(SHIFT_RULES).map(([key, val]) => `
+                            <option value="${key}" ${record.shiftType === key ? 'selected' : ''}>${val.label}</option>
+                        `).join('')}
+                    </select>
+                </div>
+                
+                <div class="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                    <p class="text-yellow-400 text-xs flex items-center gap-1">
+                        <i data-lucide="info" class="w-3 h-3"></i>
+                        ໝາຍເຫດ: ພາກເຊົ້າຫ້າມເກີນ 11:59, 12:00 ຂຶ້ນໄປແມ່ນພາກແລງ.
+                    </p>
+                    <p class="text-red-400 text-[10px] mt-1">* ຫາກຂໍ້ມູນບໍ່ຄົບ (ຂາດ Check-in ຫຼື Check-out) ຈະຖືກໄລ່ເປັນ "ຂາດວຽກ".</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="handleEditAttendance('${recordId}', '${employeeId}', '${date}')" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/30 transition-all">
+                    ບັນທຶກການແກ້ໄຂ
+                </button>
+                <button onclick="closeModal('editAttendanceModal')" class="px-6 py-3 bg-white/10 text-white rounded-xl font-medium hover:bg-white/20 transition-colors">
+                    ຍົກເລີກ
+                </button>
+            </div>
+        </div>
+    `;
+    modal.classList.add('active');
+    lucide.createIcons();
+}
+
+async function handleEditAttendance(recordId, employeeId, date) {
+    const checkIn = document.getElementById('editAttCheckIn').value;
+    const checkOut = document.getElementById('editAttCheckOut').value;
+    const shiftType = document.getElementById('editAttShift').value;
+
+    // Add seconds if not present
+    const formatTime = (t) => {
+        if (!t) return null;
+        return t.split(':').length === 2 ? t + ':00' : t;
+    };
+
+    if (checkIn && checkIn > "11:59") {
+        showNotification('ຄຳເຕືອນ: ເວລາເຂົ້າວຽກ (ພາກເຊົ້າ) ກາຍ 11:59', 'warning');
+    }
+    
+    if (checkOut && checkOut < "12:00") {
+        showNotification('ຄຳເຕືອນ: ເວລາອອກວຽກ ຄວນເປັນພາກແລງ (ຫຼັງ 12:00)', 'warning');
+    }
+
+    const data = {
+        employeeId,
+        date,
+        checkIn: formatTime(checkIn),
+        checkOut: formatTime(checkOut),
+        shiftType
+    };
+
+    let result;
+    if (recordId && recordId !== 'null' && recordId !== '') {
+        result = await callAPI(`/api/attendance/${recordId}`, data, 'PUT');
+    } else {
+        // If no record exists, we might want to create one
+        // For now, let's just show an error if recordId is missing, 
+        // or we could implement a POST /api/attendance/manual
+        showNotification('ບໍ່ພົບບັນທຶກເດີມ, ບໍ່ສາມາດແກ້ໄຂໄດ້', 'error');
+        return;
+    }
+
+    if (result.success) {
+        showNotification('ແກ້ໄຂເວລາສຳເລັດ!', 'success');
+        closeModal('editAttendanceModal');
+        await loadAllData();
+        renderAttendanceTable();
+    } else {
+        showNotification(result.error || 'ເກີດຂໍ້ຜິດພາດ', 'error');
+    }
 }
 
 function getWorkingHoursNumber(checkIn, checkOut) {

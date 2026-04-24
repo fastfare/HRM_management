@@ -17,7 +17,15 @@ async function performExport() {
     switch (state.exportType) {
         case 'attendance':
             data = prepareAttendanceData();
-            filename = `attendance_report_${state.exportPeriod}_${Date.now()}.xlsx`;
+            filename = `attendance_report_${Date.now()}.xlsx`;
+            break;
+        case 'attendance-summary':
+            data = prepareAttendanceSummaryData();
+            filename = `attendance_summary_${Date.now()}.xlsx`;
+            break;
+        case 'attendance-matrix':
+            data = prepareAttendanceMatrixData();
+            filename = `attendance_matrix_${Date.now()}.xlsx`;
             break;
         case 'employees':
             data = prepareEmployeeData();
@@ -60,20 +68,55 @@ async function performExport() {
 }
 
 function prepareAttendanceData() {
-    const filtered = filterDataByPeriod(state.attendance);
+    const startDate = document.getElementById('reportStartDate')?.value;
+    const endDate = document.getElementById('reportEndDate')?.value;
+    
+    let filtered;
+    if (startDate && endDate) {
+        filtered = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
+    } else {
+        filtered = filterDataByPeriod(state.attendance);
+    }
 
     return filtered.map(record => {
         const emp = state.employees.find(e => e.id === record.employeeId);
         return {
+            'ວັນທີ່': record.date,
             'ລະຫັດພະນັກງານ': emp?.empCode || '-',
             'ຊື່-ນາມສະກຸນ': emp?.fullName || '-',
             'ພະແນກ': emp?.department || '-',
-            'ວັນທີ່': record.date,
             'ເຂົ້າວຽກ': record.checkIn || '-',
             'ອອກວຽກ': record.checkOut || '-',
-            'ສະຖານທີ່ເຂົ້າ': `${record.checkInLat}, ${record.checkInLng}`,
-            'ສະຖານທີ່ອອກ': record.checkOutLat ? `${record.checkOutLat}, ${record.checkOutLng}` : '-',
-            'ສະຖານະ': record.checkIn ? (isLate(record.checkIn) ? 'ມາສາຍ' : 'ປົກກະຕິ') : 'ຂາດວຽກ'
+            'ຊົ່ວໂມງເຮັດວຽກ': record.workHours || 0,
+            'ສະຖານະ': record.checkIn ? (isLate(record.checkIn, record.shiftType) ? 'ມາສາຍ' : 'ປົກກະຕິ') : 'ຂາດວຽກ'
+        };
+    });
+}
+
+function prepareAttendanceSummaryData() {
+    const startDate = document.getElementById('reportStartDate')?.value;
+    const endDate = document.getElementById('reportEndDate')?.value;
+    
+    let filteredAttendance;
+    if (startDate && endDate) {
+        filteredAttendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
+    } else {
+        filteredAttendance = state.attendance; // Fallback or handle appropriately
+    }
+
+    return state.employees.filter(e => e.status === 'active').map(emp => {
+        const empAtt = filteredAttendance.filter(a => a.employeeId === emp.id);
+        const present = empAtt.filter(a => a.checkIn).length;
+        const late = empAtt.filter(a => isLate(a.checkIn, a.shiftType)).length;
+        const totalHours = empAtt.reduce((sum, a) => sum + (a.workHours || 0), 0);
+
+        return {
+            'ລະຫັດພະນັກງານ': emp.empCode,
+            'ຊື່-ນາມສະກຸນ': emp.fullName,
+            'ພະແນກ': emp.department,
+            'ມື້ເຮັດວຽກທັງໝົດ': present,
+            'ມາສາຍ (ຄັ້ງ)': late,
+            'ຊົ່ວໂມງລວມ': totalHours.toFixed(2)
         };
     });
 }
@@ -233,4 +276,53 @@ function renderReports() {
 
     document.getElementById('contentArea').innerHTML = content;
     lucide.createIcons();
+}
+
+function prepareAttendanceMatrixData() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const startDate = document.getElementById('reportStartDate')?.value || firstDay;
+    const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
+    
+    // Calculate all dates in range
+    const getDatesInRange = (start, end) => {
+        const dates = [];
+        let curr = new Date(start);
+        const last = new Date(end);
+        while (curr <= last) {
+            dates.push(new Date(curr).toISOString().split('T')[0]);
+            curr.setDate(curr.getDate() + 1);
+        }
+        return dates;
+    };
+
+    const dateRange = getDatesInRange(startDate, endDate);
+    const activeEmps = state.employees.filter(e => e.status === 'active');
+
+    return activeEmps.map((emp, idx) => {
+        const empAtt = state.attendance.filter(a => a.employeeId === emp.id && a.date >= startDate && a.date <= endDate);
+        let total = 0;
+
+        const row = {
+            'ລຳດັບ': idx + 1,
+            'ລະຫັດພະນັກງານ': emp.empCode,
+            'ຊື່ ແລະ ນາມສະກຸນ': emp.fullName
+        };
+
+        // Fill dates in range
+        dateRange.forEach(d => {
+            const record = empAtt.find(a => a.date === d);
+            const isPresent = record && record.checkIn && record.checkOut;
+            const isIncomplete = record && (!record.checkIn || !record.checkOut);
+            
+            if (isPresent) total++;
+            
+            // Use day number as column header
+            const dayNum = d.split('-')[2];
+            row[dayNum] = isPresent ? '✓' : (isIncomplete ? '✕' : '');
+        });
+
+        row['ລວມ'] = total;
+        return row;
+    });
 }

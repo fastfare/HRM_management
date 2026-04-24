@@ -11,7 +11,7 @@ const exportRoutes = require('./routes/export');
 
 const app = express();
 // change default port here:
-const PORT = process.env.PORT || 4000; // <-- set to non-3000 port
+const PORT = process.env.PORT || 4000; // Set back to 4000 as requested
 
 // Middleware
 app.use(cors());
