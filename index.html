@@ -376,8 +376,8 @@
             </button>
             <button id="checkOutBtn" 
               onclick="handleCheckOut()"
-              ${(state.locationStatus !== 'in_range' && !isSpecialUser()) || !state.todayAttendance.checkIn || state.todayAttendance.checkOut || state.loading ? 'disabled' : ''}
-              class="touch-btn p-5 rounded-2xl flex flex-col items-center gap-2 transition-all ${(state.locationStatus === 'in_range' || isSpecialUser()) && state.todayAttendance.checkIn && !state.todayAttendance.checkOut ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white/50'}">
+              ${(state.locationStatus !== 'in_range' && !isSpecialUser()) || !state.todayAttendance.checkIn || state.loading ? 'disabled' : ''}
+              class="touch-btn p-5 rounded-2xl flex flex-col items-center gap-2 transition-all ${(state.locationStatus === 'in_range' || isSpecialUser()) && state.todayAttendance.checkIn ? 'bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white/10 text-white/50'}">
               <i data-lucide="${state.loading ? 'loader-2' : 'log-out'}" class="w-8 h-8 ${state.loading ? 'animate-spin' : ''}"></i>
               <span class="font-medium text-sm">${state.loading ? 'ກຳລັງບັນທຶກ...' : 'ອອກວຽກ'}</span>
               ${state.todayAttendance.checkOut ? `<span class="text-xs opacity-80">✓ ${state.todayAttendance.checkOut}</span>` : ''}
@@ -819,6 +819,7 @@
 
     async function handleCheckIn() {
       console.log('>>> BUTTON CLICK: CHECK-IN');
+      if (!confirm('ຢືນຢັນການເຂົ້າວຽກ?')) return;
       try {
         if (!state.user) {
           alert('ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່');
@@ -913,6 +914,7 @@
 
     async function handleCheckOut() {
       console.log('>>> BUTTON CLICK: CHECK-OUT');
+      if (!confirm('ຢືນຢັນການອອກວຽກ? (ລະບົບຈະບັນທຶກເວລາລ່າສຸດເປັນເວລາອອກວຽກ)')) return;
       try {
         if (!state.user) return;
         

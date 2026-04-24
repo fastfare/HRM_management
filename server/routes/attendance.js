@@ -74,10 +74,16 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
         const actualEmployeeId = employee.id; // Always use UUID
 
         const attendance = readJSON('attendance.json');
-        const existing = attendance.find(rec => rec.employeeId === actualEmployeeId && rec.date === today && rec.checkIn);
+        const existing = attendance.find(rec => rec.employeeId === actualEmployeeId && rec.date === today);
 
         if (existing) {
-            return res.json({ success: false, error: 'ທ່ານໄດ້ເຂົ້າວຽກແລ້ວມື້ນີ້' });
+            // Already checked in, return existing record info
+            return res.json({ 
+                success: true, 
+                message: 'ທ່ານໄດ້ເຂົ້າວຽກແລ້ວ (ບັນທຶກເວລາທຳອິດ)', 
+                checkIn: existing.checkIn, 
+                status: existing.status 
+            });
         }
 
         const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
@@ -97,6 +103,7 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
             checkInPhotoUrl: req.file ? `/uploads/attendance/${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${req.file.filename}` : null,
             status,
             workHours: 0,
+            otHours: 0,
             createdAt: now.toISOString()
         };
 
@@ -109,7 +116,6 @@ router.post('/checkin', uploadAttendancePhoto, (req, res) => {
         }
 
         console.log('Check-in successful saved.');
-
         res.json({ success: true, message: 'ເຂົ້າວຽກສຳເລັດ', checkIn: timeNow, status });
 
     } catch (error) {
@@ -150,19 +156,45 @@ router.post('/checkout', (req, res) => {
         const recordIndex = attendance.findIndex(rec => rec.employeeId === actualEmployeeId && rec.date === today);
 
         if (recordIndex === -1) return res.json({ success: false, error: 'ບໍ່ພົບບັນທຶກເຂົ້າວຽກມື້ນີ້' });
-        if (attendance[recordIndex].checkOut) return res.json({ success: false, error: 'ທ່ານໄດ້ອອກວຽກແລ້ວ' });
 
         const record = attendance[recordIndex];
-        const checkInTime = new Date(`${today} ${record.checkIn}`);
-        const checkOutTime = new Date(`${today} ${timeNow}`);
-        const workHours = Math.max(0, (checkOutTime - checkInTime) / (1000 * 60 * 60) - 1).toFixed(2);
+        const shiftType = record.shiftType || 'standard';
+        const shift = SHIFT_RULES[shiftType] || SHIFT_RULES.standard;
+
+        // Times for calculation
+        const checkInTimeStr = `${today} ${record.checkIn}`;
+        const checkOutTimeStr = `${today} ${timeNow}`;
+        const shiftInTimeStr = `${today} ${shift.in}`;
+        const shiftOutTimeStr = `${today} ${shift.out}`;
+
+        const checkInTime = new Date(checkInTimeStr);
+        const checkOutTime = new Date(checkOutTimeStr);
+        const shiftInTime = new Date(shiftInTimeStr);
+        const shiftOutTime = new Date(shiftOutTimeStr);
+
+        // Effective start time: if came early, count from shift start. If came late, count from actual check-in.
+        const effectiveStart = checkInTime < shiftInTime ? shiftInTime : checkInTime;
+        
+        // Total duration in hours
+        const totalDurationHrs = Math.max(0, (checkOutTime - effectiveStart) / (1000 * 60 * 60));
+        
+        // Subtract 1 hour for lunch if worked more than 5 hours
+        const lunchBreak = totalDurationHrs > 5 ? 1 : 0;
+        const workHours = (totalDurationHrs - lunchBreak).toFixed(2);
+
+        // OT Calculation: Hours after shift end
+        let otHours = 0;
+        if (checkOutTime > shiftOutTime) {
+            otHours = parseFloat(((checkOutTime - shiftOutTime) / (1000 * 60 * 60)).toFixed(2));
+        }
 
         attendance[recordIndex] = {
             ...record,
             checkOut: timeNow,
             checkOutLat: parseFloat(lat || 0),
             checkOutLng: parseFloat(lng || 0),
-            workHours: parseFloat(workHours)
+            workHours: parseFloat(workHours),
+            otHours: otHours
         };
 
         const saveSuccess = writeJSON('attendance.json', attendance);
@@ -171,8 +203,8 @@ router.post('/checkout', (req, res) => {
             return res.json({ success: false, error: 'ບໍ່ສາມາດບັນທຶກຂໍ້ມູນອອກວຽກໄດ້' });
         }
 
-        console.log('Check-out successful saved.');
-        res.json({ success: true, message: 'ອອກວຽກສຳເລັດ', checkOut: timeNow, workHours });
+        console.log('Check-out successful saved (updated to latest).');
+        res.json({ success: true, message: 'ອອກວຽກສຳເລັດ (ອັບເດດເວລາລ່າສຸດ)', checkOut: timeNow, workHours, otHours });
 
     } catch (error) {
         console.error('Check-out Critical Error:', error);
