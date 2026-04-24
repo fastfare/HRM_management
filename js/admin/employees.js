@@ -198,6 +198,20 @@ function openRegisterModal() {
                         `).join('')}
                     </select>
                 </div>
+                <div class="col-span-2 space-y-2">
+                    <label class="text-white/70 text-sm mb-1 block">ມື້ເຮັດວຽກ</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        ${['ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ', 'ທິດ'].map((day, i) => {
+                            const val = (i + 1) % 7;
+                            return `
+                                <label class="flex items-center gap-2 bg-white/5 p-2 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
+                                    <input type="checkbox" name="workDays" value="${val}" ${i < 6 ? 'checked' : ''} class="w-4 h-4 accent-violet-500">
+                                    <span class="text-xs text-white/80">${day}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
             </div>
             
             <div class="flex gap-3">
@@ -246,6 +260,7 @@ async function handleRegister() {
         baseSalary,
         hireDate,
         shiftType: document.getElementById('regShift').value,
+        workDays: Array.from(document.querySelectorAll('#registerModal input[name="workDays"]:checked')).map(cb => parseInt(cb.value)),
         role: 'employee'
     };
 
@@ -335,6 +350,21 @@ function openEditModal(empId) {
                         `).join('')}
                     </select>
                 </div>
+                <div class="col-span-2 space-y-2">
+                    <label class="text-white/70 text-sm mb-1 block">ມື້ເຮັດວຽກ</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        ${['ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ', 'ທິດ'].map((day, i) => {
+                            const val = (i + 1) % 7;
+                            const isChecked = (emp.workDays || [1,2,3,4,5,6]).map(Number).includes(val);
+                            return `
+                                <label class="flex items-center gap-2 bg-white/5 p-2 rounded-lg cursor-pointer hover:bg-white/10 transition-colors">
+                                    <input type="checkbox" name="workDays" value="${val}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-blue-500">
+                                    <span class="text-xs text-white/80">${day}</span>
+                                </label>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
             </div>
             
             <div class="flex gap-3">
@@ -361,7 +391,8 @@ async function handleEdit() {
         phone: document.getElementById('editPhone').value.trim(),
         baseSalary: parseFloat(document.getElementById('editSalary').value) || 0,
         hireDate: document.getElementById('editHireDate').value,
-        shiftType: document.getElementById('editShift').value
+        shiftType: document.getElementById('editShift').value,
+        workDays: Array.from(document.querySelectorAll('#editModal input[name="workDays"]:checked')).map(cb => parseInt(cb.value))
     };
 
     const result = await callAPI(`/api/employees/${empId}`, data, 'PUT');

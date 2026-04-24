@@ -39,6 +39,10 @@ async function performExport() {
             data = preparePayrollData();
             filename = `payroll_${state.exportPeriod}_${Date.now()}.xlsx`;
             break;
+        case 'ot':
+            data = prepareOTData();
+            filename = `ot_report_${state.exportPeriod}_${Date.now()}.xlsx`;
+            break;
         case 'summary':
             data = prepareSummaryData();
             filename = `summary_report_${state.exportPeriod}_${Date.now()}.xlsx`;
@@ -51,8 +55,10 @@ async function performExport() {
     XLSX.utils.book_append_sheet(wb, ws, "Report");
 
     // Auto-size columns
-    const max_width = data.reduce((w, r) => Math.max(w, ...Object.values(r).map(v => v.toString().length)), 10);
-    ws['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: max_width }));
+    if (data.length > 0) {
+        const max_width = data.reduce((w, r) => Math.max(w, ...Object.values(r).map(v => (v || '').toString().length)), 10);
+        ws['!cols'] = Object.keys(data[0] || {}).map(() => ({ wch: max_width + 5 }));
+    }
 
     // Download
     XLSX.writeFile(wb, filename);
@@ -101,7 +107,7 @@ function prepareAttendanceSummaryData() {
     if (startDate && endDate) {
         filteredAttendance = state.attendance.filter(a => a.date >= startDate && a.date <= endDate);
     } else {
-        filteredAttendance = state.attendance; // Fallback or handle appropriately
+        filteredAttendance = state.attendance; 
     }
 
     return state.employees.filter(e => e.status !== 'inactive').map(emp => {
@@ -131,6 +137,7 @@ function prepareEmployeeData() {
         'ຕຳແໜ່ງ': emp.position,
         'ເງິນເດືອນ': emp.baseSalary,
         'ວັນທີ່ເຂົ້າວຽກ': emp.hireDate,
+        'ມື້ເຮັດວຽກ': (emp.workDays || [1,2,3,4,5,6]).map(d => ['ອາທິດ', 'ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ'][d]).join(', '),
         'ສະຖານະ': emp.status
     }));
 }
@@ -156,7 +163,6 @@ function prepareLeaveData() {
 }
 
 function preparePayrollData() {
-    // Group by department
     const deptGroups = {};
     state.employees.filter(e => e.status !== 'inactive').forEach(emp => {
         if (!deptGroups[emp.department]) {
@@ -215,8 +221,6 @@ function filterDataByPeriod(data, dateField = 'date') {
     return data;
 }
 
-// ============ OTHER MENU SECTIONS ============
-
 function renderPayroll() {
     const content = `
         <div class="space-y-4">
@@ -230,11 +234,11 @@ function renderPayroll() {
                 <h3 class="text-white font-bold mb-4">ລາຍການເງິນເດືອນຕາມພະແນກ</h3>
                 <div class="space-y-3">
                     ${Object.entries(state.employees.reduce((acc, emp) => {
-        if (!acc[emp.department]) acc[emp.department] = { count: 0, total: 0 };
-        acc[emp.department].count++;
-        acc[emp.department].total += emp.baseSalary || 0;
-        return acc;
-    }, {})).map(([dept, data]) => `
+                        if (!acc[emp.department]) acc[emp.department] = { count: 0, total: 0 };
+                        acc[emp.department].count++;
+                        acc[emp.department].total += emp.baseSalary || 0;
+                        return acc;
+                    }, {})).map(([dept, data]) => `
                         <div class="flex items-center justify-between p-3 bg-white/5 rounded-lg">
                             <div>
                                 <p class="text-white font-medium">${dept}</p>
@@ -284,7 +288,6 @@ function prepareAttendanceMatrixData() {
     const startDate = document.getElementById('reportStartDate')?.value || firstDay;
     const endDate = document.getElementById('reportEndDate')?.value || now.toISOString().split('T')[0];
     
-    // Calculate all dates in range
     const getDatesInRange = (start, end) => {
         const dates = [];
         let curr = new Date(start);
@@ -309,7 +312,6 @@ function prepareAttendanceMatrixData() {
             'ຊື່ ແລະ ນາມສະກຸນ': emp.fullName
         };
 
-        // Fill dates in range
         dateRange.forEach(d => {
             const record = empAtt.find(a => a.date === d);
             const isPresent = record && record.checkIn && record.checkOut;
@@ -317,12 +319,63 @@ function prepareAttendanceMatrixData() {
             
             if (isPresent) total++;
             
-            // Use day number as column header
             const dayNum = d.split('-')[2];
             row[dayNum] = isPresent ? '✓' : (isIncomplete ? '✕' : '');
         });
 
         row['ລວມ'] = total;
         return row;
+    });
+}
+
+function prepareOTData() {
+    const startDate = document.getElementById('reportStartDate')?.value;
+    const endDate = document.getElementById('reportEndDate')?.value;
+    
+    let filtered;
+    if (startDate && endDate) {
+        filtered = state.attendance.filter(a => a.date >= startDate && a.date <= endDate && a.checkOut);
+    } else {
+        filtered = filterDataByPeriod(state.attendance).filter(a => a.checkOut);
+    }
+
+    return filtered.map(record => {
+        const emp = state.employees.find(e => e.id === record.employeeId);
+        const workHours = parseFloat(record.workHours || 0);
+        
+        // Get day of week (0=Sun, 1=Mon, ..., 6=Sat)
+        const dateObj = new Date(record.date);
+        const dayOfWeek = dateObj.getDay();
+        
+        // Check if it's a work day for this employee (Default to Mon-Sat if not set)
+        const empWorkDays = emp?.workDays || [1, 2, 3, 4, 5, 6];
+        const isWorkDay = empWorkDays.map(Number).includes(dayOfWeek);
+        
+        let normalHours = 0;
+        let otHours = 0;
+        
+        if (isWorkDay) {
+            // On a work day, standard is 8 hours, rest is OT
+            normalHours = Math.min(8, workHours);
+            otHours = Math.max(0, workHours - 8);
+        } else {
+            // On an off day, everything is OT
+            normalHours = 0;
+            otHours = workHours;
+        }
+        
+        return {
+            'ວັນທີ່': record.date,
+            'ວັນໃນອາທິດ': ['ອາທິດ', 'ຈັນ', 'ອັງຄານ', 'ພຸດ', 'ພະຫັດ', 'ສຸກ', 'ເສົາ'][dayOfWeek],
+            'ລະຫັດພະນັກງານ': emp?.empCode || '-',
+            'ຊື່-ນາມສະກຸນ': emp?.fullName || '-',
+            'ພະແນກ': emp?.department || '-',
+            'ປະເພດມື້': isWorkDay ? 'ມື້ວຽກປົກກະຕິ' : 'ມື້ພັກ (OT)',
+            'ເຂົ້າວຽກ': record.checkIn || '-',
+            'ອອກວຽກ': record.checkOut || '-',
+            'ຊົ່ວໂມງເຮັດວຽກລວມ': workHours,
+            'ຊົ່ວໂມງປົກກະຕິ': normalHours,
+            'ໂມງ OT': parseFloat(otHours.toFixed(2))
+        };
     });
 }

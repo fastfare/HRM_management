@@ -74,6 +74,7 @@ const menus = [
             { id: 'report-employees', icon: 'users', label: 'ຂໍ້ມູນພະນັກງານ', exportType: 'employees' },
             { id: 'report-leaves', icon: 'calendar', label: 'ລາຍງານການລາ', exportType: 'leaves' },
             { id: 'report-payroll', icon: 'dollar-sign', label: 'ລາຍງານເງິນເດືອນ', exportType: 'payroll' },
+            { id: 'report-ot', icon: 'clock-3', label: 'ລາຍງານໂມງ OT', exportType: 'ot' },
             { id: 'report-summary', icon: 'pie-chart', label: 'ລາຍງານສະຫຼຸບ', exportType: 'summary' }
         ]
     }
@@ -86,6 +87,7 @@ const exportOptions = [
     { id: 'employees', label: 'ຂໍ້ມູນພະນັກງານ', icon: 'users', desc: 'ລາຍຊື່ ແລະ ຂໍ້ມູນພະນັກງານ' },
     { id: 'leaves', label: 'ລາຍງານການລາ', icon: 'calendar', desc: 'ປະຫວັດການຂໍລາທັງໝົດ' },
     { id: 'payroll', label: 'ລາຍງານເງິນເດືອນ', icon: 'dollar-sign', desc: 'ສະຫຼຸບເງິນເດືອນປະຈຳເດືອນ' },
+    { id: 'ot', label: 'ລາຍງານໂມງ OT', icon: 'clock-3', desc: 'ຄິດໄລ່ຊົ່ວໂມງເຮັດວຽກເກີນກຳນົດ' },
     { id: 'summary', label: 'ລາຍງານສະຫຼຸບ', icon: 'pie-chart', desc: 'ສະຖິຕິລວມທັງໝົດ' }
 ];
 
